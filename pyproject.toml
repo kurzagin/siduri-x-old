@@ -5,6 +5,9 @@ description = "Local-first AI VTuber and stream companion foundation"
 requires-python = ">=3.12"
 dependencies = []
 
+[project.optional-dependencies]
+postgres = ["psycopg[binary]>=3.2,<4"]
+
 [tool.pyright]
 include = ["apps", "packages", "tests"]
 pythonVersion = "3.12"

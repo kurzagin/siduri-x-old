@@ -1,3 +1,3 @@
 # Memory model
 
-Memory classes are core identity, Me knowledge, preferences, relationship, episodic, session, and derived summaries. Items need provenance, confidence, sensitivity, allowed audiences, timestamps, expiry, supersession, correction, and deletion. AI proposals are not authoritative until approved.
+Memory classes are core identity, Me knowledge, preferences, relationship, episodic, session, and derived summaries. Items need provenance, confidence, sensitivity, allowed audiences, timestamps, expiry, supersession, correction, and deletion. `MemoryService` provides durable local SQLite CRUD, revision history, expiry, supersession, audience-filtered keyword retrieval, audit events, and proposal approval/rejection. PostgreSQL is the canonical deployment schema in `migrations/002_memory.sql`; install `siduri[postgres]` to use the optional adapter. AI proposals are not authoritative until approved.

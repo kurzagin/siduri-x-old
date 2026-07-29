@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "preferred_name": "Kur Zagin (fictional sample)",
+    "stage_name": "Kur Zagin",
+    "languages": ["Japanese", "English", "Indonesian"],
+    "timezone": "Asia/Jakarta"
+  },
+  "relationship_with_siduri": {
+    "role": "creator and Master",
+    "preferred_address_private": "Master",
+    "preferred_address_stream": "Master",
+    "public_topics": ["creative work", "games", "stream context"],
+    "private_topics": ["legal identity", "address", "credentials", "finances"]
+  },
+  "communication": {
+    "preferred_tone": "concise, calm, direct",
+    "correction_style": "respectful and evidence-based",
+    "verbosity": "compact"
+  },
+  "habits": {},
+  "interests": {"games": ["Genshin Impact"]},
+  "projects": {"siduri": {"role": "Records Keeper and stream companion"}},
+  "privacy": {
+    "default_visibility": "private",
+    "fields_allowed_on_stream": ["stage_name", "public_projects", "current_game"],
+    "fields_never_allowed_on_stream": ["legal_name", "birth_date", "address", "credentials", "finances"]
+  }
+}
