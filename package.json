@@ -1,0 +1,11 @@
+{
+  "name": "siduri",
+  "private": true,
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2"
+  }
+}
