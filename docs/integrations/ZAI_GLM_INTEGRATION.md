@@ -15,4 +15,4 @@ Alternatively, copy `.env.example` to `.env` and set `SIDURI_MODEL_PROVIDER=zai`
 
 The default endpoint is `https://api.z.ai/api/paas/v4/chat/completions`. A configured key changes only the model provider; the mock provider remains available in tests and can be selected with `SIDURI_MODEL_PROVIDER=mock`.
 
-The adapter currently uses non-streaming JSON responses, disables reasoning output for the response-planning call, applies a short timeout, and does not retry. Usage/cost telemetry and streaming are later hardening work.
+The adapter uses non-streaming JSON responses, disables reasoning output for the response-planning call, applies a bounded timeout, and classifies transport failures for router retry/fallback decisions. The router records provider/model, latency, failure, fallback, and circuit metadata without prompts or credentials. Streaming and cost accounting remain future work because the current adapter does not consume provider usage fields.

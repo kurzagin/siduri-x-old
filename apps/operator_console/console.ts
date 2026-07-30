@@ -7,6 +7,9 @@ const meEditor = document.querySelector<HTMLTextAreaElement>("#me-editor");
 const loadMe = document.querySelector<HTMLButtonElement>("#load-me");
 const saveMe = document.querySelector<HTMLButtonElement>("#save-me");
 const meStatus = document.querySelector<HTMLSpanElement>("#me-status");
+const evidenceOutput = document.querySelector<HTMLPreElement>("#evidence-output");
+const mockObservation = document.querySelector<HTMLButtonElement>("#mock-observation");
+const refreshEvidence = document.querySelector<HTMLButtonElement>("#refresh-evidence");
 
 async function loadMeProfile(): Promise<void> {
   const response = await fetch("http://127.0.0.1:8765/me");
@@ -41,5 +44,20 @@ saveMe?.addEventListener("click", async () => {
   }
 });
 void loadMeProfile().catch(() => { if (meStatus) meStatus.textContent = "Orchestrator offline"; });
+
+async function loadEvidence(): Promise<void> {
+  const [evidenceResponse, observationResponse] = await Promise.all([
+    fetch("http://127.0.0.1:8765/evidence"), fetch("http://127.0.0.1:8765/observations"),
+  ]);
+  const evidence = await evidenceResponse.json() as Record<string, unknown>;
+  const observations = await observationResponse.json() as Record<string, unknown>;
+  if (evidenceOutput) evidenceOutput.textContent = JSON.stringify({ evidence, observations }, null, 2);
+}
+mockObservation?.addEventListener("click", async () => {
+  await fetch("http://127.0.0.1:8765/dev/mock-observation", { method: "POST" });
+  await loadEvidence();
+});
+refreshEvidence?.addEventListener("click", () => { void loadEvidence(); });
+void loadEvidence().catch(() => { if (evidenceOutput) evidenceOutput.textContent = "Evidence service offline"; });
 
 export {};

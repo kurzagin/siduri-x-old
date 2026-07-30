@@ -29,7 +29,40 @@ Phase 2 uses durable local SQLite memory and persisted local `Me` data, with Pos
 - [x] Preserve mock fallback and offline tests.
 - [x] Run one live request after the operator configures `ZAI_API_KEY`.
 
-The next planned implementation is documented in `docs/CODEX_PROMPT_03_MODEL_AND_ADAPTERS.md`.
+The Prompt 03 implementation is documented in `docs/CODEX_PROMPT_03_MODEL_AND_ADAPTERS.md` and is complete below.
+
+## Prompt 03: model and adapter hardening
+
+- [x] Validate typed provider configuration and expose redacted readiness state.
+- [x] Add capability routing, bounded transient retries, circuit cooldown, and degraded-mode responses.
+- [x] Normalize and validate provider response plans before overlay broadcast.
+- [x] Add privacy-safe request, failure, fallback, latency, and circuit telemetry.
+- [x] Add vision, web-search, and tool-call contracts with local fakes.
+- [x] Preserve credential-free mock operation and add failure/security regression tests.
+
+Remaining Phase 3 polish is now covered: provider registry, a second model test double, provider usage/cost fields when returned, separated transport parsing, and hard timeout enforcement.
+
+## Phase 4: local voice output
+
+- [x] VOICEVOX health check and local endpoint validation.
+- [x] Speaker/style discovery by metadata, including Nurse Robo Type T aliases.
+- [x] Audio query and synthesis client with bounded speech input.
+- [x] Priority queue, cancellation, synthesis latency, amplitude events, and subtitle-only fallback.
+- [x] Add a gated local system playback sink (`ffplay`, `pw-play`, or `paplay`).
+- [x] Emit overlay speech/amplitude events and drive preparing/speaking/idle animation states.
+- [ ] Operator verification of the OBS browser source, scene layout, monitoring, and public audio route.
+
+## E-Teyvat knowledge integration
+
+- [x] Add the trusted E-Teyvat adapter at `https://eteyvat.krzgn.xyz`.
+- [x] Preserve source URLs, dataset revisions, and preview status in results.
+- [x] Support knowledge search, entity lookup, and deterministic farming retrieval.
+- [x] Connect retrieved E-Teyvat evidence into the live response prompt.
+- [ ] Add operator-visible E-Teyvat citation display and evidence inspection.
+
+The remaining operator step is to add the overlay browser source to the desired OBS scene and verify the stream-specific audio route.
+
+The next-session continuation is [`docs/CODEX_PROMPT_04_HANDOFF.md`](docs/CODEX_PROMPT_04_HANDOFF.md): finish OBS verification and citations, then begin evidence-aware Genshin observation.
 
 ### Assumptions
 

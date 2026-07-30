@@ -52,6 +52,10 @@ class FoundationTests(unittest.TestCase):
             connection.request("POST", "/dev/mock-response")
             response = connection.getresponse()
             self.assertEqual(response.status, 202)
+            connection.request("POST", "/dev/mock-observe-response")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 202)
+            self.assertTrue(json.loads(response.read())["response"]["payload"]["evidence_ids"])
         finally:
             server.shutdown()
             server.server_close()

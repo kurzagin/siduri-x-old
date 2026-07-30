@@ -1,1 +1,12 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Siduri Operator Console</title><link rel="stylesheet" href="console.css"></head><body><main><p class="eyebrow">SIDURI / OPERATOR</p><h1>Foundation console</h1><p class="muted">Private local controls. Nothing here posts to a public platform.</p><div class="grid"><article><h2>Service</h2><p id="health">Checking…</p><p id="version"></p></article><article><h2>Response gate</h2><p id="approval">No response queued.</p><button id="trigger">Trigger mock response</button></article></div><section class="editor"><h2>Me knowledge</h2><p class="muted">Local editable profile. Keep private facts out of stream-safe fields.</p><textarea id="me-editor" spellcheck="false" aria-label="Me knowledge JSON"></textarea><div><button id="load-me" class="secondary">Reload</button> <button id="save-me">Save profile</button><span id="me-status"></span></div></section><pre id="output"></pre></main><script src="console.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Siduri Operator Console</title><link rel="stylesheet" href="console.css"></head>
+<body><main>
+  <p class="eyebrow">SIDURI / OPERATOR</p>
+  <h1>Foundation console</h1>
+  <p class="muted">Private local controls. Nothing here posts to a public platform.</p>
+  <div class="grid"><article><h2>Service</h2><p id="health">Checking…</p><p id="version"></p></article><article><h2>Response gate</h2><p id="approval">No response queued.</p><button id="trigger">Trigger mock response</button></article></div>
+  <section class="editor"><h2>Me knowledge</h2><p class="muted">Local editable profile. Keep private facts out of stream-safe fields.</p><textarea id="me-editor" spellcheck="false" aria-label="Me knowledge JSON"></textarea><div><button id="load-me" class="secondary">Reload</button> <button id="save-me">Save profile</button><span id="me-status"></span></div></section>
+  <section class="evidence"><h2>Evidence inspection</h2><p class="muted">Bounded E-Teyvat citations and synthetic observations. Fixture observations are not live gameplay evidence.</p><button id="mock-observation" class="secondary">Create fixture observation</button> <button id="refresh-evidence" class="secondary">Refresh evidence</button><pre id="evidence-output">No evidence loaded.</pre></section>
+  <pre id="output"></pre>
+</main><script src="console.js"></script></body></html>

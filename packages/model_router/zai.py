@@ -7,7 +7,8 @@ from typing import Any, Callable
 from uuid import uuid4
 
 from apps.orchestrator.src.siduri_orchestrator.contracts import ResponsePlan
-from packages.model_router.router import GenerationRequest
+from packages.model_router.router import (AuthenticationProviderFailure, GenerationRequest,
+    RateLimitProviderFailure, ServerProviderFailure, TimeoutProviderFailure, ProviderFailure)
 
 
 class ZaiProviderError(RuntimeError):
@@ -18,6 +19,7 @@ class ZaiStructuredProvider:
     """Minimal standard-library client for Z.AI's GLM chat-completions API."""
 
     provider_id = "zai-glm-5.2"
+    model_id = "glm-5.2"
     capabilities = frozenset({"text_generation", "structured_generation"})
 
     def __init__(
@@ -31,8 +33,10 @@ class ZaiStructuredProvider:
             raise ValueError("Z.AI API key must not be empty")
         self.api_key = api_key
         self.model = model
+        self.model_id = model
         self.endpoint = base_url.rstrip("/") + "/chat/completions"
         self._opener = opener
+        self.last_usage: dict[str, int | float] = {}
 
     def generate_response(self, request: GenerationRequest) -> ResponsePlan:
         recipient_rule = f" Set recipient exactly to {request.recipient}." if request.recipient else ""
@@ -63,10 +67,31 @@ class ZaiStructuredProvider:
             with self._opener(request_object, timeout=request.timeout_seconds) as response:
                 response_body = json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as error:
-            raise ZaiProviderError(f"Z.AI request failed with HTTP {error.code}") from error
-        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as error:
-            raise ZaiProviderError("Z.AI request failed before a valid response was received") from error
+            if error.code in (401, 403):
+                raise AuthenticationProviderFailure("Z.AI authentication failed") from error
+            if error.code == 429:
+                raise RateLimitProviderFailure("Z.AI rate limit") from error
+            if 500 <= error.code < 600:
+                raise ServerProviderFailure(f"Z.AI server error {error.code}") from error
+            raise ProviderFailure(f"Z.AI request failed with HTTP {error.code}") from error
+        except (urllib.error.URLError, TimeoutError) as error:
+            raise TimeoutProviderFailure("Z.AI request timed out or was unreachable") from error
+        except json.JSONDecodeError as error:
+            raise ProviderFailure("Z.AI returned invalid transport JSON") from error
+        self.last_usage = self._usage(response_body.get("usage")) if isinstance(response_body, dict) else {}
         return self._parse_response(response_body, request.recipient)
+
+    @staticmethod
+    def _usage(value: object) -> dict[str, int | float]:
+        if not isinstance(value, dict):
+            return {}
+        result: dict[str, int | float] = {}
+        for source, target in (("prompt_tokens", "prompt_tokens"), ("completion_tokens", "completion_tokens"), ("total_tokens", "total_tokens")):
+            if isinstance(value.get(source), int) and not isinstance(value[source], bool):
+                result[target] = value[source]
+        if isinstance(value.get("cost_usd"), (int, float)) and not isinstance(value["cost_usd"], bool):
+            result["cost_usd"] = float(value["cost_usd"])
+        return result
 
     def _parse_response(self, value: object, expected_recipient: str | None = None) -> ResponsePlan:
         try:
@@ -74,31 +99,6 @@ class ZaiStructuredProvider:
             parsed = json.loads(content) if isinstance(content, str) else content
             if not isinstance(parsed, dict):
                 raise ValueError("model content was not a JSON object")
-            required = ("recipient", "intent", "semantic_summary", "spoken_ja", "subtitle_en", "subtitle_id")
-            missing = [key for key in required if not parsed.get(key)]
-            if missing:
-                raise ValueError(f"missing response fields: {', '.join(missing)}")
-            evidence_ids = parsed.get("evidence_ids", [])
-            if not isinstance(evidence_ids, list) or not all(isinstance(item, str) for item in evidence_ids):
-                raise ValueError("evidence_ids must be a list of strings")
-            confidence = float(parsed.get("confidence", 0.0))
-            if not 0.0 <= confidence <= 1.0:
-                raise ValueError("confidence must be between 0 and 1")
-            if expected_recipient is not None and str(parsed["recipient"]) != expected_recipient:
-                raise ValueError("model recipient does not match the requested audience")
-            return ResponsePlan(
-                recipient=str(parsed["recipient"]),
-                intent=str(parsed["intent"]),
-                semantic_summary=str(parsed["semantic_summary"]),
-                spoken_ja=str(parsed["spoken_ja"]),
-                subtitle_en=str(parsed["subtitle_en"]),
-                subtitle_id=str(parsed["subtitle_id"]),
-                emotion=str(parsed.get("emotion", "observant")),
-                speech_priority=int(parsed.get("speech_priority", 50)),
-                interruptible=bool(parsed.get("interruptible", True)),
-                evidence_ids=tuple(evidence_ids),
-                confidence=confidence,
-                requires_operator_approval=bool(parsed.get("requires_operator_approval", False)),
-            )
+            return ResponsePlan.from_dict(parsed, expected_recipient)
         except (KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError) as error:
             raise ZaiProviderError("Z.AI returned invalid Siduri response JSON") from error

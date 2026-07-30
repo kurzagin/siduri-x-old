@@ -15,9 +15,15 @@ Then open these files in a browser:
 - `apps/overlay/index.html` — public transparent-style Venus overlay.
 - `apps/operator_console/index.html` — local operator shell.
 
-The operator console can trigger `POST /dev/mock-response`. The overlay reconnects to `ws://127.0.0.1:8765/ws` and displays the Japanese speech line plus English and Indonesian subtitles.
+The operator console can trigger `POST /dev/mock-response`. The overlay reconnects to `ws://127.0.0.1:8765/ws`, displays the Japanese speech line plus English and Indonesian subtitles, and reacts to real VOICEVOX speech/amplitude events.
 
 The operator console also exposes the Phase 2 local `Me` editor. The orchestrator provides `GET/PUT /me`, `GET/POST /memory`, and `GET/POST /memory/proposals` for testing audience-aware memory workflows. Local profile edits persist under ignored `data/me.json`; memory records persist under ignored `data/memory.sqlite3`. PostgreSQL deployment uses `migrations/002_memory.sql` and the optional `siduri[postgres]` adapter.
+
+The operator console also exposes fixture-first evidence inspection. `POST /dev/mock-observation` creates a synthetic, expiring observation; `GET /observations` lists retained observations and `GET /evidence` retrieves bounded E-Teyvat citation metadata. These fixtures are not live Genshin evidence and are intended to be replaced with configured screenshots later.
+
+With OBS configured and capture enabled, `POST /dev/observe-now` requests one in-memory still from the configured source and sends it through the bounded observation pipeline. The raw screenshot is neither returned nor persisted.
+
+`POST /dev/mock-observe-response` exercises the complete fixture path from observation to evidence-linked response plan, subtitles, and optional voice.
 
 ## Enable GLM-5.2
 
@@ -42,9 +48,11 @@ npm run typecheck
 npm run build
 ```
 
-This slice intentionally uses only the Python standard library at runtime. `npm install` installs the pinned TypeScript toolchain for frontend checks. PostgreSQL, Docker/Podman, OBS, and VOICEVOX are optional at this stage; see `docs/operations/ARCH_LINUX_SETUP.md`.
+This slice intentionally uses only the Python standard library at runtime. `npm install` installs the pinned TypeScript toolchain for frontend checks. PostgreSQL remains optional; this host has OBS, PipeWire audio, and a running VOICEVOX Engine. See [`docs/integrations/OBS_INTEGRATION.md`](docs/integrations/OBS_INTEGRATION.md) and [`docs/voice/VOICEVOX_INTEGRATION.md`](docs/voice/VOICEVOX_INTEGRATION.md).
 
-The next-session handoff is [`docs/CODEX_PROMPT_03_MODEL_AND_ADAPTERS.md`](docs/CODEX_PROMPT_03_MODEL_AND_ADAPTERS.md).
+Prompt 03 model reliability and Phase 4 voice integration are implemented: provider configuration is validated at startup, routing has bounded retries/cooldowns, structured responses are validated before broadcast, E-Teyvat evidence is available to the model, and telemetry is privacy-safe. The remaining manual step is adding the overlay browser source to the desired OBS scene.
+
+The next-session handoff is [`docs/CODEX_PROMPT_04_HANDOFF.md`](docs/CODEX_PROMPT_04_HANDOFF.md). It covers OBS verification, operator-visible E-Teyvat citations, and the next evidence-aware Genshin observation phase.
 
 To install the missing Arch Linux host tooling yourself, run:
 
