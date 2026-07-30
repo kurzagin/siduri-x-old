@@ -1,6 +1,6 @@
 # Arch Linux setup
 
-Required local tools: Python 3.12+ (3.14 tested), Node.js/npm, and Git. Recommended future tools are `uv`, Docker or Podman Compose, PostgreSQL, OBS Studio, PipeWire, and headless VOICEVOX Engine. This host currently lacks the optional container, database, and OBS binaries, so the foundation’s no-dependency Python path is the reproducible baseline.
+Required local tools: Python 3.12+ (3.14 tested), Node.js/npm, and Git. Recommended future tools are `uv`, Docker or Podman Compose, PostgreSQL, OBS Studio, PipeWire, and headless VOICEVOX Engine. This host currently has OBS but lacks usable Docker access and a running VOICEVOX service, so the foundation’s no-dependency Python path plus subtitle fallback is the reproducible baseline.
 
 ## Manual installer
 

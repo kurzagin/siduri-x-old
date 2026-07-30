@@ -7,6 +7,7 @@ dependencies = []
 
 [project.optional-dependencies]
 postgres = ["psycopg[binary]>=3.2,<4"]
+platforms = ["cryptography>=42,<47", "websocket-client>=1.8,<2"]
 
 [tool.pyright]
 include = ["apps", "packages", "tests"]

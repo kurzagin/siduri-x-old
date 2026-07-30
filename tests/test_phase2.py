@@ -91,6 +91,20 @@ class Phase2Tests(unittest.TestCase):
             expired = reopened.create(MemoryItem(content="old fact", provenance="user", sensitivity="stream_safe", expires_at="2000-01-01T00:00:00+00:00"))
             self.assertIsNone(reopened.get(expired.memory_id))
 
+    def test_memory_proposal_review_state_persists(self) -> None:
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "memory.sqlite3"
+            service = MemoryService(path)
+            proposal = service.propose(MemoryProposal(content="persistent candidate", provenance="test"))
+            service.update_proposal(proposal.proposal_id, content="edited persistent candidate")
+            reopened = MemoryService(path)
+            self.assertEqual(reopened.proposals()[0].content, "edited persistent candidate")
+            self.assertEqual(reopened.proposals()[0].status, "pending")
+            item = reopened.approve(proposal.proposal_id)
+            self.assertEqual(reopened.get(item.memory_id), item)
+            approved = MemoryService(path).proposals()[0]
+            self.assertEqual(approved.status, "approved")
+
     def test_memory_supersession_and_audit_history(self) -> None:
         service = MemoryService()
         original = service.create(MemoryItem(content="old preference", provenance="user"))

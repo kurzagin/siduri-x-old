@@ -1150,91 +1150,91 @@ TikTok and external knowledge adapters should not block the first live version.
 
 ### Required before implementation
 
-- [ ] `README.md`
-- [ ] `AGENTS.md`
-- [ ] `PLANS.md`
-- [ ] `docs/product/PROJECT_CHARTER.md`
-- [ ] `docs/product/SCOPE_AND_NON_GOALS.md`
-- [ ] `docs/architecture/ARCHITECTURE.md`
-- [ ] `docs/architecture/SYSTEM_CONTEXT.md`
-- [ ] `docs/architecture/COMPONENT_MODEL.md`
-- [ ] `docs/architecture/EVENT_CATALOG.md`
-- [ ] `docs/architecture/DOMAIN_MODEL.md`
-- [ ] `docs/architecture/PROVIDER_CAPABILITIES.md`
-- [ ] `docs/security/SECURITY_BASELINE.md`
-- [ ] `docs/security/PRIVACY_MODEL.md`
-- [ ] `docs/operations/ARCH_LINUX_SETUP.md`
-- [ ] ADR template
-- [ ] ADR: Python and TypeScript responsibility split
-- [ ] ADR: local-first architecture
-- [ ] ADR: PostgreSQL portability
-- [ ] ADR: OBS as default capture boundary
-- [ ] ADR: public actions require approval
+- [x] `README.md`
+- [x] `AGENTS.md`
+- [x] `PLANS.md`
+- [x] `docs/product/PROJECT_CHARTER.md`
+- [x] `docs/product/SCOPE_AND_NON_GOALS.md`
+- [x] `docs/architecture/ARCHITECTURE.md`
+- [x] `docs/architecture/SYSTEM_CONTEXT.md`
+- [x] `docs/architecture/COMPONENT_MODEL.md`
+- [x] `docs/architecture/EVENT_CATALOG.md`
+- [x] `docs/architecture/DOMAIN_MODEL.md`
+- [x] `docs/architecture/PROVIDER_CAPABILITIES.md`
+- [x] `docs/security/SECURITY_BASELINE.md`
+- [x] `docs/security/PRIVACY_MODEL.md`
+- [x] `docs/operations/ARCH_LINUX_SETUP.md`
+- [x] ADR template
+- [x] ADR: Python and TypeScript responsibility split
+- [x] ADR: local-first architecture
+- [x] ADR: PostgreSQL portability
+- [x] ADR: OBS as default capture boundary
+- [x] ADR: public actions require approval
 
 ### Required before personality implementation
 
-- [ ] `docs/personality/IDENTITY_CANON.md`
-- [ ] `docs/personality/PERSONALITY_SPEC.md`
-- [ ] `docs/personality/RELATIONSHIP_WITH_KUR.md`
-- [ ] `docs/personality/AUDIENCE_AND_RECIPIENTS.md`
-- [ ] `docs/personality/RESPONSE_POLICY.md`
-- [ ] `docs/personality/LANGUAGE_POLICY.md`
-- [ ] `docs/memory/MEMORY_MODEL.md`
-- [ ] `docs/memory/ME_SCHEMA.md`
-- [ ] `docs/memory/MEMORY_WRITE_POLICY.md`
-- [ ] `docs/memory/PUBLIC_DISCLOSURE_POLICY.md`
-- [ ] fictional `me.example.yaml`
-- [ ] personality evaluation cases
+- [x] `docs/personality/IDENTITY_CANON.md`
+- [x] `docs/personality/PERSONALITY_SPEC.md`
+- [x] `docs/personality/RELATIONSHIP_WITH_KUR.md`
+- [x] `docs/personality/AUDIENCE_AND_RECIPIENTS.md`
+- [x] `docs/personality/RESPONSE_POLICY.md`
+- [x] `docs/personality/LANGUAGE_POLICY.md`
+- [x] `docs/memory/MEMORY_MODEL.md`
+- [x] `docs/memory/ME_SCHEMA.md`
+- [x] `docs/memory/MEMORY_WRITE_POLICY.md`
+- [x] `docs/memory/PUBLIC_DISCLOSURE_POLICY.md`
+- [x] fictional `me.example.yaml`
+- [x] personality evaluation cases
 
 ### Required before voice and overlay
 
-- [ ] `docs/voice/VOICE_SPEC.md`
-- [ ] `docs/voice/VOICEVOX_INTEGRATION.md`
-- [ ] `docs/voice/VOICE_ATTRIBUTION_AND_TERMS.md`
-- [ ] `docs/voice/AUDIO_ROUTING_ARCH.md`
-- [ ] `docs/architecture/RESPONSE_CONTRACT.md`
-- [ ] `docs/integrations/OBS_INTEGRATION.md`
-- [ ] `docs/product/AVATAR_STATE_MACHINE.md`
-- [ ] `docs/product/SUBTITLE_LAYOUT.md`
-- [ ] emergency mute runbook
+- [x] `docs/voice/VOICE_SPEC.md`
+- [x] `docs/voice/VOICEVOX_INTEGRATION.md`
+- [x] `docs/voice/VOICE_ATTRIBUTION_AND_TERMS.md`
+- [x] `docs/voice/AUDIO_ROUTING_ARCH.md`
+- [x] `docs/architecture/RESPONSE_CONTRACT.md`
+- [x] `docs/integrations/OBS_INTEGRATION.md`
+- [x] `docs/product/AVATAR_STATE_MACHINE.md`
+- [x] `docs/product/SUBTITLE_LAYOUT.md`
+- [x] `docs/operations/EMERGENCY_MUTE.md`
 
 ### Required before vision
 
-- [ ] `docs/vision/VISION_PIPELINE.md`
-- [ ] `docs/vision/GENSHIN_STATE_SCHEMA.md`
-- [ ] `docs/vision/EVIDENCE_AND_CONFIDENCE.md`
-- [ ] `docs/vision/CAPTURE_AND_REDACTION.md`
-- [ ] `docs/security/SCREEN_PRIVACY_THREAT_MODEL.md`
-- [ ] fixture collection policy
-- [ ] vision evaluation set
-- [ ] false-positive and uncertainty policy
+- [x] `docs/vision/VISION_PIPELINE.md`
+- [x] `docs/vision/GENSHIN_STATE_SCHEMA.md`
+- [x] `docs/vision/EVIDENCE_AND_CONFIDENCE.md`
+- [x] `docs/vision/CAPTURE_AND_REDACTION.md`
+- [x] `docs/security/SCREEN_PRIVACY_THREAT_MODEL.md`
+- [x] fixture collection policy
+- [x] vision evaluation set
+- [x] false-positive and uncertainty policy
 
 ### Required before platform integration
 
-- [ ] `docs/integrations/PLATFORM_EVENT_CONTRACT.md`
-- [ ] `docs/integrations/YOUTUBE.md`
-- [ ] `docs/integrations/TWITCH.md`
-- [ ] `docs/integrations/TIKTOK_CAPABILITY_MATRIX.md`
-- [ ] `docs/security/OAUTH_AND_SECRETS.md`
-- [ ] `docs/security/OUTBOUND_ACTION_APPROVAL.md`
-- [ ] rate-limit policy
-- [ ] moderation policy
-- [ ] token revocation runbook
+- [x] `docs/integrations/PLATFORM_EVENT_CONTRACT.md`
+- [x] `docs/integrations/YOUTUBE.md`
+- [x] `docs/integrations/TWITCH.md`
+- [x] `docs/integrations/TIKTOK_CAPABILITY_MATRIX.md`
+- [x] `docs/security/OAUTH_AND_SECRETS.md`
+- [x] `docs/security/OUTBOUND_ACTION_APPROVAL.md`
+- [x] rate-limit policy
+- [x] moderation policy
+- [x] token revocation runbook
 
 ### Required before live operation
 
-- [ ] `docs/testing/TEST_STRATEGY.md`
-- [ ] `docs/testing/EVALUATION_PLAN.md`
-- [ ] `docs/testing/LATENCY_BUDGETS.md`
-- [ ] `docs/testing/SOAK_TEST_PLAN.md`
-- [ ] `docs/operations/RUNBOOK.md`
-- [ ] `docs/operations/STREAM_PREFLIGHT.md`
-- [ ] `docs/operations/DEGRADED_MODES.md`
-- [ ] `docs/operations/INCIDENT_RESPONSE.md`
-- [ ] `docs/operations/BACKUP_AND_RESTORE.md`
-- [ ] `docs/operations/DATA_RETENTION.md`
-- [ ] `docs/operations/RELEASE_PROCESS.md`
-- [ ] `CHANGELOG.md`
+- [x] `docs/testing/TEST_STRATEGY.md`
+- [x] `docs/testing/EVALUATION_PLAN.md`
+- [x] `docs/testing/LATENCY_BUDGETS.md`
+- [x] `docs/testing/SOAK_TEST_PLAN.md`
+- [x] `docs/operations/RUNBOOK.md`
+- [x] `docs/operations/STREAM_PREFLIGHT.md`
+- [x] `docs/operations/DEGRADED_MODES.md`
+- [x] `docs/operations/INCIDENT_RESPONSE.md`
+- [x] `docs/operations/BACKUP_AND_RESTORE.md`
+- [x] `docs/operations/DATA_RETENTION.md`
+- [x] `docs/operations/RELEASE_PROCESS.md`
+- [x] `CHANGELOG.md`
 
 ---
 

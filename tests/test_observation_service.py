@@ -34,6 +34,19 @@ class ObservationServiceTests(unittest.TestCase):
         self.assertIsNotNone(result.observation)
         self.assertEqual(seen, [b"safe"])
 
+    def test_observe_now_bounds_vision_provider_failure(self) -> None:
+        class BrokenProvider:
+            provider_id = "broken"
+            model_id = "broken"
+
+            def observe(self, frame):
+                raise RuntimeError("provider unavailable")
+
+        capture = ObsCaptureBoundary(FakeObsTransport(b"raw"), source_name="genshin", enabled=True)
+        result = ObservationService(capture, ObservationPipeline(), BrokenProvider()).observe_now()
+        self.assertIsNone(result.observation)
+        self.assertEqual(result.capture_reason, "vision_failed")
+
 
 if __name__ == "__main__":
     unittest.main()

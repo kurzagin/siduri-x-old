@@ -66,6 +66,15 @@ class MockStructuredProvider:
     capabilities = frozenset({"text_generation", "structured_generation"})
 
     def generate_response(self, request: GenerationRequest) -> ResponsePlan:
+        if request.task == "private_chat":
+            return ResponsePlan(
+                recipient=request.recipient or "master_private", intent="private_chat_degraded",
+                semantic_summary="Siduri is available for private conversation, but the primary model is temporarily unavailable.",
+                spoken_ja="ご主人、私はここにいます。現在は主モデルを確認できないため、確かな範囲だけでお答えします。あなたを私の創造者、Kur Zaginとして認識しています。",
+                subtitle_en="Master, I am here. The primary model is temporarily unavailable, so I will answer only within confirmed context. I recognize you as my creator, Kur Zagin.",
+                subtitle_id="Master, saya di sini. Model utama sedang tidak tersedia, jadi saya hanya akan menjawab berdasarkan konteks yang terkonfirmasi. Saya mengenali Anda sebagai pencipta saya, Kur Zagin.",
+                emotion="cautious", confidence=0.5,
+            )
         return ResponsePlan(recipient=request.recipient or "master_stream", intent=request.task,
             semantic_summary="Siduri is responding from a bounded identity and memory context.",
             spoken_ja="ご主人、確認できる範囲でお答えします。不確かな情報は、確かなふりをしません。",

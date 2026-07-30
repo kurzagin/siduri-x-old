@@ -43,7 +43,7 @@ class ZaiStructuredProvider:
         payload = {
             "model": self.model,
             "messages": [
-                {"role": "system", "content": "Return only one JSON object matching this exact Siduri ResponsePlan shape. Do not include markdown, explanations, or reasoning: {recipient:string,intent:string,semantic_summary:string,spoken_ja:string,subtitle_en:string,subtitle_id:string,emotion:string,speech_priority:integer,interruptible:boolean,evidence_ids:string[],confidence:number between 0 and 1,requires_operator_approval:boolean}. The Japanese, English, and Indonesian fields must express the same meaning." + recipient_rule},
+                {"role": "system", "content": "Return only one JSON object matching this exact Siduri ResponsePlan shape. Do not include markdown, explanations, or reasoning: {recipient:string,intent:string,semantic_summary:string,spoken_ja:string,subtitle_en:string,subtitle_id:string,emotion:string,speech_priority:integer,interruptible:boolean,evidence_ids:string[],confidence:number between 0 and 1,requires_operator_approval:boolean,memory_proposals:[{content:string,provenance:string,sensitivity:string,allowed_audiences:string[]}]}. memory_proposals are isolated candidates only: propose at most four durable facts explicitly stated or strongly grounded in the conversation; otherwise return []. They are never canonical memory. The Japanese, English, and Indonesian fields must express the same meaning." + recipient_rule},
                 {"role": "user", "content": "Generate the response plan for this bounded context:\n" + request.prompt},
             ],
             "thinking": {"type": "disabled"},

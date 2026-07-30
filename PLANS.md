@@ -3,11 +3,11 @@
 ## Current slice: Foundation and vertical-slice skeleton
 
 - [x] Inspect the repository and local toolchain.
-- [ ] Establish typed contracts, configuration, persistence boundaries, and ADRs.
-- [ ] Implement a dependency-light local orchestrator with health/readiness/version endpoints and WebSocket broadcast.
-- [ ] Implement the public overlay and private operator console shells.
-- [ ] Add adapter interfaces, fake knowledge, migration, tests, and reproducible commands.
-- [ ] Run the practical local checks and record limitations.
+- [x] Establish typed contracts, configuration, persistence boundaries, and ADRs.
+- [x] Implement a dependency-light local orchestrator with health/readiness/version endpoints and WebSocket broadcast.
+- [x] Implement the public overlay and private operator console shells.
+- [x] Add adapter interfaces, fake knowledge, migration, tests, and reproducible commands.
+- [x] Run the practical local checks and record limitations.
 
 ## Phase 2: Personality, relationship, and memory
 
@@ -58,11 +58,23 @@ Remaining Phase 3 polish is now covered: provider registry, a second model test 
 - [x] Preserve source URLs, dataset revisions, and preview status in results.
 - [x] Support knowledge search, entity lookup, and deterministic farming retrieval.
 - [x] Connect retrieved E-Teyvat evidence into the live response prompt.
-- [ ] Add operator-visible E-Teyvat citation display and evidence inspection.
+- [x] Add operator-visible E-Teyvat citation display and evidence inspection.
 
-The remaining operator step is to add the overlay browser source to the desired OBS scene and verify the stream-specific audio route.
+The remaining operator step is to add the overlay browser source to the desired OBS scene and verify the stream-specific audio route. The orchestrator's local citation/evidence surfaces are implemented and covered by tests.
 
-The next-session continuation is [`docs/CODEX_PROMPT_04_HANDOFF.md`](docs/CODEX_PROMPT_04_HANDOFF.md): finish OBS verification and citations, then begin evidence-aware Genshin observation.
+The current continuation is [`docs/CODEX_PROMPT_07_HANDOFF.md`](docs/CODEX_PROMPT_07_HANDOFF.md): authorize test platforms, start VOICEVOX, and complete operator-owned OBS/live-service verification.
+
+## Phase 7: YouTube and Twitch platform boundary
+
+- [x] Add versioned normalized platform event and outbound action contracts.
+- [x] Add bounded deduplication and operator-only platform event inbox.
+- [x] Add conservative viewer recipient selection and approval-gated reply suggestions.
+- [x] Add official YouTube Live Chat discovery, ingestion, and approved-send adapter.
+- [x] Add official Twitch EventSub normalization, signature verification, subscription, and approved-send adapter.
+- [x] Add OAuth authorization URL, code exchange, refresh, revocation, one-time state, and optional encrypted token persistence.
+- [x] Add operator-console review surfaces and audit-gated action endpoints.
+- [x] Wire credentialed OAuth callback routing and long-lived YouTube polling/Twitch WebSocket session ownership.
+- [ ] Run live provider verification with operator-approved test channels.
 
 ### Assumptions
 

@@ -42,11 +42,13 @@ class ResponsePlan:
     evidence_ids: tuple[str, ...] = ()
     confidence: float = 1.0
     requires_operator_approval: bool = False
+    memory_proposals: tuple[dict[str, Any], ...] = ()
     schema_version: int = 1
 
     def to_dict(self) -> dict[str, Any]:
         result = asdict(self)
         result["evidence_ids"] = list(self.evidence_ids)
+        result["memory_proposals"] = [dict(item) for item in self.memory_proposals]
         return result
 
     @classmethod
@@ -73,11 +75,28 @@ class ResponsePlan:
         evidence = value.get("evidence_ids", [])
         if not isinstance(evidence, list) or len(evidence) > 32 or not all(isinstance(item, str) and item and len(item) <= 128 for item in evidence):
             raise ValueError("evidence_ids must be a bounded list of non-empty strings")
+        raw_proposals = value.get("memory_proposals", [])
+        if not isinstance(raw_proposals, list) or len(raw_proposals) > 4:
+            raise ValueError("memory_proposals must be a bounded list")
+        proposals: list[dict[str, Any]] = []
+        for candidate in raw_proposals:
+            if not isinstance(candidate, dict):
+                raise ValueError("memory proposal must be an object")
+            content = candidate.get("content")
+            if not isinstance(content, str) or not content.strip() or len(content) > 2000:
+                raise ValueError("memory proposal content is invalid")
+            sensitivity = candidate.get("sensitivity", "private")
+            audiences = candidate.get("allowed_audiences", ["master_private"])
+            provenance = candidate.get("provenance", "siduri_private_chat")
+            if sensitivity not in {"public", "stream_safe", "private", "secret"} or not isinstance(provenance, str) or not isinstance(audiences, list) or len(audiences) > 8 or not all(isinstance(item, str) and item for item in audiences):
+                raise ValueError("memory proposal metadata is invalid")
+            proposals.append({"content": content.strip(), "provenance": provenance[:160], "sensitivity": sensitivity, "allowed_audiences": audiences})
         return cls(recipient=value["recipient"], intent=value["intent"], semantic_summary=value["semantic_summary"],
                    spoken_ja=value["spoken_ja"], subtitle_en=value["subtitle_en"], subtitle_id=value["subtitle_id"],
                    emotion=value.get("emotion", "observant") if isinstance(value.get("emotion", "observant"), str) else "observant",
                    speech_priority=priority, interruptible=interruptible,
                    evidence_ids=tuple(evidence), confidence=float(confidence), requires_operator_approval=approval,
+                   memory_proposals=tuple(proposals),
                    schema_version=int(value.get("schema_version", 1)))
 
 

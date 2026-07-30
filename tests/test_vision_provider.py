@@ -21,11 +21,20 @@ class StateTransport(Transport):
         return {"readings": [{"character_active": "Keqing", "game_state": "exploration", "current_hp": 60}]}
 
 
+class EmptyTransport(Transport):
+    def complete(self, *, model: str, instruction: str, image_data_url: str) -> object:
+        return {"readings": []}
+
+
 class VisionProviderTests(unittest.TestCase):
     def test_assets_detect_jpeg_by_signature_not_extension(self) -> None:
         assets = load_asset_images(Path(__file__).parents[1] / "assets")
-        self.assertEqual(len(assets), 3)
-        self.assertTrue(all(item.mime_type == "image/jpeg" for item in assets))
+        self.assertEqual(len(assets), 4)
+        formats = {item.path.name: item.mime_type for item in assets}
+        self.assertEqual(formats["genshin-1.png"], "image/jpeg")
+        self.assertEqual(formats["genshin-2.png"], "image/jpeg")
+        self.assertEqual(formats["genshin--3"], "image/jpeg")
+        self.assertEqual(formats["genshin-4.png"], "image/png")
 
     def test_zai_adapter_normalizes_response_without_domain_coupling(self) -> None:
         transport = Transport()
@@ -41,6 +50,14 @@ class VisionProviderTests(unittest.TestCase):
         frame = RedactedFrame(b"\xff\xd8\xfffixture", "fixture", "2026-01-01T00:00:00+00:00", "hash", ())
         readings = provider.analyze(request_from_frame(frame, "Return visible state."))
         self.assertEqual([item.entity for item in readings], ["character_active", "game_state", "current_hp"])
+
+    def test_zai_adapter_makes_empty_result_explicitly_uncertain(self) -> None:
+        provider = ZaiGlm5VisionProvider(EmptyTransport())
+        frame = RedactedFrame(b"\xff\xd8\xfffixture", "fixture", "2026-01-01T00:00:00+00:00", "hash", ())
+        readings = provider.analyze(request_from_frame(frame, "Return visible state."))
+        self.assertEqual(len(readings), 1)
+        self.assertEqual(readings[0].entity, "scene")
+        self.assertEqual(readings[0].confidence, 0.0)
 
 
 if __name__ == "__main__":

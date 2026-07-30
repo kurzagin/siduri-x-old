@@ -66,6 +66,17 @@ class ZaiGlm5VisionProvider:
                 ))
             except (KeyError, TypeError, ValueError):
                 continue
+        if not readings:
+            # An empty normalized response is still an observation, but it
+            # must say explicitly that the frame yielded no usable evidence.
+            # This prevents downstream code from treating missing data as a
+            # silently successful perception pass.
+            return (VisionReading(
+                entity="scene",
+                value="no usable visible evidence",
+                confidence=0.0,
+                competing_interpretations=("frame content is unclear or unreadable",),
+            ),)
         return tuple(readings)
 
 

@@ -64,6 +64,17 @@ class MemoryService:
             self._initialize_database()
             self._load_database()
 
+    def close(self) -> None:
+        if self._db is not None:
+            self._db.close()
+            self._db = None
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
     def _initialize_database(self) -> None:
         assert self._db is not None
         self._db.executescript(
@@ -200,6 +211,7 @@ class MemoryService:
         return tuple(item for _, item in scored[:limit])
 
     def propose(self, proposal: MemoryProposal) -> MemoryProposal:
+        self._validate_proposal(proposal)
         self._proposals[proposal.proposal_id] = proposal
         if self._db is not None:
             self._db.execute("INSERT OR REPLACE INTO memory_proposals VALUES (?, ?, ?, ?, ?, ?)", (proposal.proposal_id, proposal.content, proposal.provenance, proposal.sensitivity, json.dumps(sorted(proposal.allowed_audiences)), proposal.status))
@@ -222,10 +234,37 @@ class MemoryService:
 
     def reject(self, proposal_id: str) -> MemoryProposal:
         proposal = self._proposals[proposal_id]
+        if proposal.status != "pending":
+            raise ValueError(f"proposal is already {proposal.status}")
         self._proposals[proposal_id] = replace(proposal, status="rejected")
         self._persist_proposal(self._proposals[proposal_id])
         self._audit("proposal_rejected", None, proposal_id)
         return self._proposals[proposal_id]
+
+    def update_proposal(self, proposal_id: str, *, content: str, sensitivity: str | None = None, allowed_audiences: frozenset[str] | None = None) -> MemoryProposal:
+        proposal = self._proposals[proposal_id]
+        if proposal.status != "pending":
+            raise ValueError(f"proposal is already {proposal.status}")
+        if not content.strip() or len(content) > 2000:
+            raise ValueError("proposal content must be non-empty and bounded")
+        updated = replace(proposal, content=content.strip(), sensitivity=sensitivity or proposal.sensitivity,
+                          allowed_audiences=allowed_audiences if allowed_audiences is not None else proposal.allowed_audiences)
+        self._validate_proposal(updated)
+        self._proposals[proposal_id] = updated
+        self._persist_proposal(updated)
+        self._audit("proposal_updated", None, proposal_id)
+        return updated
+
+    @staticmethod
+    def _validate_proposal(proposal: MemoryProposal) -> None:
+        if not proposal.content.strip() or len(proposal.content) > 2000:
+            raise ValueError("proposal content must be non-empty and bounded")
+        if proposal.sensitivity not in {"public", "stream_safe", "private", "secret"}:
+            raise ValueError("proposal sensitivity is invalid")
+        if len(proposal.provenance) > 160 or not proposal.provenance.strip():
+            raise ValueError("proposal provenance is invalid")
+        if len(proposal.allowed_audiences) > 8 or any(not isinstance(audience, str) or not audience or len(audience) > 64 for audience in proposal.allowed_audiences):
+            raise ValueError("proposal audiences are invalid")
 
     def _persist_proposal(self, proposal: MemoryProposal) -> None:
         if self._db is not None:

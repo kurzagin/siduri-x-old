@@ -30,6 +30,11 @@ class ObservationService:
         if captured.frame is None:
             return ObserveNowResult(None, capture_reason=captured.reason)
         frame = self.redactor(captured.frame) if self.redactor else captured.frame
-        result = self.pipeline.ingest(frame, source_name=captured.source_name,
-                                      provider=self.provider)
+        try:
+            result = self.pipeline.ingest(frame, source_name=captured.source_name,
+                                          provider=self.provider)
+        except (OSError, RuntimeError, ValueError):
+            # Provider output and transport failures must not tear down the
+            # operator HTTP request or expose provider-specific details.
+            return ObserveNowResult(None, capture_reason="vision_failed")
         return ObserveNowResult(result.observation, capture_reason=result.reason, duplicate=result.duplicate)

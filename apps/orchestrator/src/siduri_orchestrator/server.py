@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import socket
 import threading
 from dataclasses import replace
@@ -13,8 +14,9 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from uuid import uuid4
+from urllib.parse import parse_qs, urlparse
 
-from .contracts import EventEnvelope, MockProvider
+from .contracts import EventEnvelope, MockProvider, ResponsePlan
 from packages.config.env import load_dotenv
 from packages.config.providers import ProviderConfig, configured_provider_state
 from packages.memory.service import MemoryItem, MemoryProposal, MemoryService
@@ -30,13 +32,21 @@ from packages.voice.voicevox import AmplitudeEvent, NullAudioSink, SpeechService
 from packages.observation.pipeline import FixtureObservationProvider, ObservationPipeline
 from packages.observation.png import PixelRect, redact_png
 from packages.observation.service import ObservationService
+from packages.observation.grounding import current_observations, resolve_visible_labels
 from packages.obs.capture import ObsCaptureBoundary, ObsWebSocketTransport
 from packages.vision.contract import VisionObservationAdapter
+from packages.vision.multipass import MultiPassVisionProvider
+from packages.vision.crops import CroppedVisionProvider, ImageRegion
 from packages.vision.zai_glm5v import ZaiGlm5VisionProvider, ZaiGlm5VisionTransport
+from packages.platforms.adapters import BearerCredentials, TwitchEventSubAdapter, YouTubeLiveChatAdapter
+from packages.platforms.contracts import ActionStatus, OutboundAction, OutboundActionService, Platform, PlatformEvent, PlatformEventHub, PlatformIngressGuard, utc_now
+from packages.platforms.auth import EncryptedFileTokenStore, OAuthClient, OAuthFlowManager, OAuthProvider
+from packages.platforms.sessions import OptionalTwitchSocketFactory, TwitchEventSubRunner, TwitchEventSubSession, YouTubeLiveChatPoller, YouTubeLiveChatRunner
 
 LOG = logging.getLogger("siduri.orchestrator")
 CLIENTS: set[socket.socket] = set()
 CLIENTS_LOCK = threading.Lock()
+PENDING_RESPONSES: dict[str, tuple[ResponsePlan, dict[str, Any]]] = {}
 PROVIDER = MockProvider()
 REPO_ROOT = Path(__file__).resolve().parents[4]
 load_dotenv(REPO_ROOT / ".env")
@@ -46,7 +56,10 @@ ME_PATH = DATA_ROOT / "me.json"
 ME_PROFILE = MeProfile.from_json_file(ME_PATH) if ME_PATH.exists() else MeProfile.from_json_file(REPO_ROOT / "config" / "me.example.json")
 MEMORY = MemoryService(DATA_ROOT / "memory.sqlite3")
 TELEMETRY = TelemetryRecorder(path=DATA_ROOT / "telemetry.jsonl")
-ETEYVAT = EteyvatKnowledgeSource(os.getenv("SIDURI_ETEYVAT_URL", "https://eteyvat.krzgn.xyz"))
+ETEYVAT = EteyvatKnowledgeSource(
+    os.getenv("SIDURI_ETEYVAT_URL", "https://eteyvat.krzgn.xyz"),
+    timeout_seconds=float(os.getenv("SIDURI_ETEYVAT_TIMEOUT", "3")),
+)
 MODEL_PROVIDER = os.getenv("SIDURI_MODEL_PROVIDER", "zai" if os.getenv("ZAI_API_KEY") else "mock")
 MODEL_NAME = os.getenv("SIDURI_MODEL_NAME", "glm-5.2")
 MODEL_ENDPOINT = os.getenv("ZAI_API_BASE_URL", "https://api.z.ai/api/paas/v4")
@@ -69,20 +82,72 @@ VOICE_ENABLED = os.getenv("SIDURI_VOICEVOX_ENABLED", "true").lower() == "true"
 OBSERVATIONS = ObservationPipeline(ttl_seconds=int(os.getenv("SIDURI_OBSERVATION_TTL_SECONDS", "30")))
 FIXTURE_VISION = FixtureObservationProvider()
 VISION_PROVIDER_MODE = os.getenv("SIDURI_VISION_PROVIDER", "fixture").lower()
+DEFAULT_VISION_INSTRUCTION = (
+    "Analyze only visible game evidence. Return JSON with a readings array; each reading must have "
+    "entity, value, confidence, source_crop, ocr_text, and competing_interpretations. "
+    "Never infer hidden state. If the frame is unclear or no label is readable, return exactly one "
+    "scene reading with value 'no usable visible evidence', confidence 0.0, and explain the uncertainty."
+)
 if VISION_PROVIDER_MODE == "zai" and os.getenv("ZAI_API_KEY"):
-    ACTIVE_VISION = VisionObservationAdapter(
-        ZaiGlm5VisionProvider(
-            ZaiGlm5VisionTransport(os.environ["ZAI_API_KEY"], MODEL_ENDPOINT),
-            model=os.getenv("SIDURI_VISION_MODEL", "glm-5v-turbo"),
-        ),
-        instruction=os.getenv("SIDURI_VISION_INSTRUCTION", "Analyze only visible game evidence and return normalized observations."),
+    vision_transport = ZaiGlm5VisionTransport(
+        os.environ["ZAI_API_KEY"], MODEL_ENDPOINT,
+        timeout_seconds=float(os.getenv("SIDURI_VISION_TIMEOUT", "15")),
     )
+    vision_model = os.getenv("SIDURI_VISION_MODEL", "glm-5v-turbo")
+    vision_provider = ZaiGlm5VisionProvider(vision_transport, model=vision_model)
+    context_pass = VisionObservationAdapter(vision_provider, os.getenv("SIDURI_VISION_INSTRUCTION", DEFAULT_VISION_INSTRUCTION))
+    detail_pass = VisionObservationAdapter(vision_provider, os.getenv(
+        "SIDURI_VISION_DETAIL_INSTRUCTION",
+        "Inspect visible HUD text and named entities, especially quest text and party labels. "
+        "Read every visible party member and identify the active member only when the active indicator is visible. "
+        "Return only readable evidence with confidence and competing interpretations. Do not infer hidden state.",
+    ))
+    if os.getenv("SIDURI_VISION_CROP_ENABLED", "true").lower() == "true":
+        detail_pass = CroppedVisionProvider(detail_pass, ImageRegion("right-party-hud", 1640, 180, 280, 460), top_party_is_active=True)
+    if os.getenv("SIDURI_VISION_MULTIPASS", "true").lower() == "true":
+        ACTIVE_VISION = MultiPassVisionProvider((context_pass, detail_pass), provider_id=vision_provider.provider_id, model_id=vision_provider.model_id)
+    else:
+        ACTIVE_VISION = context_pass
 else:
     ACTIVE_VISION = FIXTURE_VISION
 OBS_SOURCE_NAME = os.getenv("SIDURI_OBS_SOURCE_NAME", "genshin")
 OBS_TRANSPORT = ObsWebSocketTransport(os.getenv("SIDURI_OBS_URL", "ws://127.0.0.1:4455"), os.getenv("SIDURI_OBS_PASSWORD") or None)
 OBS_CAPTURE = ObsCaptureBoundary(OBS_TRANSPORT, source_name=OBS_SOURCE_NAME,
                                  enabled=os.getenv("SIDURI_OBS_CAPTURE_ENABLED", "false").lower() == "true")
+PLATFORM_EVENTS = PlatformEventHub(guard=PlatformIngressGuard())
+PLATFORM_ACTIONS = OutboundActionService(DATA_ROOT / "platform_actions.sqlite3")
+PLATFORM_STOP = threading.Event()
+PLATFORM_WORKERS: list[threading.Thread] = []
+PLATFORM_SENDERS: dict[Platform, Any] = {}
+OAUTH_TOKENS: dict[str, Any] = {}
+oauth_clients: dict[str, OAuthClient] = {}
+if os.getenv("SIDURI_YOUTUBE_CLIENT_ID") and os.getenv("SIDURI_YOUTUBE_CLIENT_SECRET"):
+    oauth_clients["youtube"] = OAuthClient(OAuthProvider(
+        "youtube", "https://accounts.google.com/o/oauth2/v2/auth", "https://oauth2.googleapis.com/token",
+        os.environ["SIDURI_YOUTUBE_CLIENT_ID"], os.environ["SIDURI_YOUTUBE_CLIENT_SECRET"],
+        tuple(filter(None, os.getenv("SIDURI_YOUTUBE_OAUTH_SCOPES", "https://www.googleapis.com/auth/youtube.readonly").split())),
+        "https://oauth2.googleapis.com/revoke",
+    ))
+if os.getenv("SIDURI_TWITCH_CLIENT_ID") and os.getenv("SIDURI_TWITCH_CLIENT_SECRET"):
+    oauth_clients["twitch"] = OAuthClient(OAuthProvider(
+        "twitch", "https://id.twitch.tv/oauth2/authorize", "https://id.twitch.tv/oauth2/token",
+        os.environ["SIDURI_TWITCH_CLIENT_ID"], os.environ["SIDURI_TWITCH_CLIENT_SECRET"],
+        tuple(filter(None, os.getenv("SIDURI_TWITCH_OAUTH_SCOPES", "user:read:chat user:write:chat").split())),
+        "https://id.twitch.tv/oauth2/revoke",
+    ))
+if os.getenv("SIDURI_OAUTH_ENCRYPTION_KEY"):
+    OAUTH_TOKEN_STORE = EncryptedFileTokenStore(os.getenv("SIDURI_OAUTH_TOKEN_FILE", str(DATA_ROOT / "oauth_tokens.enc")), os.environ["SIDURI_OAUTH_ENCRYPTION_KEY"])
+else:
+    OAUTH_TOKEN_STORE = None
+OAUTH_FLOWS = OAuthFlowManager(oauth_clients, token_store=OAUTH_TOKEN_STORE)
+if os.getenv("SIDURI_YOUTUBE_ACCESS_TOKEN"):
+    PLATFORM_SENDERS[Platform.YOUTUBE] = YouTubeLiveChatAdapter(
+        BearerCredentials(os.environ["SIDURI_YOUTUBE_ACCESS_TOKEN"]),
+    )
+if os.getenv("SIDURI_TWITCH_ACCESS_TOKEN") and os.getenv("SIDURI_TWITCH_CLIENT_ID") and os.getenv("SIDURI_TWITCH_USER_ID"):
+    PLATFORM_SENDERS[Platform.TWITCH] = TwitchEventSubAdapter(
+        BearerCredentials(os.environ["SIDURI_TWITCH_ACCESS_TOKEN"], os.environ["SIDURI_TWITCH_CLIENT_ID"], os.getenv("SIDURI_TWITCH_USER_ID")),
+    )
 
 
 def configured_redactor() -> Any:
@@ -122,6 +187,88 @@ def memory_dict(item: MemoryItem | MemoryProposal) -> dict[str, Any]:
     value = dict(item.__dict__)
     value["allowed_audiences"] = sorted(item.allowed_audiences)
     return value
+
+
+def platform_event_from_body(body: dict[str, Any]) -> PlatformEvent:
+    try:
+        platform = Platform(str(body["platform"]))
+    except (KeyError, ValueError) as error:
+        raise ValueError("platform must be youtube or twitch") from error
+    return PlatformEvent(
+        platform=platform,
+        event_type=str(body.get("event_type", "chat_message")),
+        source_message_id=str(body["source_message_id"]),
+        channel_id=str(body["channel_id"]),
+        author_id=str(body["author_id"]),
+        author_display_name=str(body.get("author_display_name", "unknown")),
+        text=str(body["text"]),
+        occurred_at=str(body.get("occurred_at", utc_now())),
+        metadata={str(key): str(value) for key, value in body.get("metadata", {}).items()} if isinstance(body.get("metadata", {}), dict) else {},
+    )
+
+
+def platform_reply_suggestion(event_id: str, language: str = "en") -> tuple[ResponsePlan, OutboundAction]:
+    event = next((item for item in PLATFORM_EVENTS.events() if item.event_id == event_id), None)
+    if event is None:
+        raise KeyError(event_id)
+    if language not in {"ja", "en", "id"}:
+        raise ValueError("language must be ja, en, or id")
+    prompt = PromptAssembler(ME_PROFILE).assemble(PromptContext(
+        recipient=Recipient.VIEWER_DIRECT,
+        user_text=f"[PLATFORM EVENT] platform={event.platform.value}; author={event.author_display_name}; message={event.text}",
+    ))
+    plan = ROUTER.generate(GenerationRequest(task="platform_reply_suggestion", prompt=prompt, recipient=Recipient.VIEWER_DIRECT.value))
+    plan = replace(plan, recipient=Recipient.VIEWER_DIRECT.value, intent="platform_reply_suggestion", requires_operator_approval=True, evidence_ids=(event.event_id,))
+    text = {"ja": plan.spoken_ja, "en": plan.subtitle_en, "id": plan.subtitle_id}[language]
+    action = PLATFORM_ACTIONS.propose(OutboundAction(
+        platform=event.platform, action_type="chat_message", target_id=event.channel_id, text=text, evidence_ids=(event.event_id,),
+    ))
+    return plan, action
+
+
+def refresh_platform_sender(provider_id: str, token: Any) -> None:
+    OAUTH_TOKENS[provider_id] = token
+    if provider_id == "youtube":
+        PLATFORM_SENDERS[Platform.YOUTUBE] = YouTubeLiveChatAdapter(BearerCredentials(token.access_token))
+    elif provider_id == "twitch":
+        PLATFORM_SENDERS[Platform.TWITCH] = TwitchEventSubAdapter(BearerCredentials(token.access_token, os.getenv("SIDURI_TWITCH_CLIENT_ID"), os.getenv("SIDURI_TWITCH_USER_ID")))
+
+
+for _provider_id in oauth_clients:
+    _stored_token = OAUTH_FLOWS.load(_provider_id)
+    if _stored_token is not None and not _stored_token.expired():
+        refresh_platform_sender(_provider_id, _stored_token)
+
+
+def start_platform_workers() -> None:
+    if os.getenv("SIDURI_PLATFORM_INGEST_ENABLED", "false").lower() != "true":
+        return
+
+    def on_events(events: tuple[PlatformEvent, ...]) -> None:
+        for event in events:
+            LOG.info("platform event accepted: platform=%s event_type=%s", event.platform.value, event.event_type)
+
+    youtube_sender = PLATFORM_SENDERS.get(Platform.YOUTUBE)
+    if isinstance(youtube_sender, YouTubeLiveChatAdapter):
+        runner = YouTubeLiveChatRunner(YouTubeLiveChatPoller(youtube_sender, PLATFORM_EVENTS), on_events)
+        worker = threading.Thread(target=runner.run_forever, args=(PLATFORM_STOP,), name="siduri-youtube-chat", daemon=True)
+        worker.start()
+        PLATFORM_WORKERS.append(worker)
+
+    twitch_sender = PLATFORM_SENDERS.get(Platform.TWITCH)
+    broadcaster_id = os.getenv("SIDURI_TWITCH_BROADCASTER_ID")
+    if isinstance(twitch_sender, TwitchEventSubAdapter) and broadcaster_id:
+        session = TwitchEventSubSession(twitch_sender, PLATFORM_EVENTS, broadcaster_id)
+        runner = TwitchEventSubRunner(session, OptionalTwitchSocketFactory(), on_events)
+        worker = threading.Thread(target=runner.run_forever, args=(PLATFORM_STOP,), name="siduri-twitch-eventsub", daemon=True)
+        worker.start()
+        PLATFORM_WORKERS.append(worker)
+
+
+def stop_platform_workers() -> None:
+    PLATFORM_STOP.set()
+    for worker in PLATFORM_WORKERS:
+        worker.join(timeout=2)
 
 
 def ws_frame(data: str) -> bytes:
@@ -164,6 +311,100 @@ def queue_voice(plan: Any) -> None:
     threading.Thread(target=SPEECH_QUEUE.run_next, name="siduri-speech", daemon=True).start()
 
 
+def grounded_response(observation: Any, correlation_id: str) -> tuple[ResponsePlan, dict[str, Any], str]:
+    """Assemble and generate one response from one current observation."""
+    grounding = resolve_visible_labels(observation, ETEYVAT)
+    prompt = PromptAssembler(ME_PROFILE).assemble(PromptContext(
+        recipient=Recipient.MASTER_STREAM,
+        user_text="live observation response request",
+        memories=MEMORY.retrieve("observation", Recipient.MASTER_STREAM),
+        observations=(observation,),
+        knowledge=grounding.prompt_items,
+    ))
+    plan = ROUTER.generate(GenerationRequest(task="observation_commentary", prompt=prompt, recipient="master_stream"))
+    evidence_ids = [observation.evidence_id, *(item["evidence_id"] for item in grounding.citations)]
+    plan = replace(plan, evidence_ids=tuple(dict.fromkeys(evidence_ids))[:32],
+                   confidence=min(plan.confidence, observation.confidence),
+                   requires_operator_approval=True)
+    metadata = {"correlation_id": correlation_id, "citations": list(grounding.citations),
+                "observation_evidence_id": observation.evidence_id,
+                "knowledge_source": ETEYVAT.source_id, "knowledge_revision": ETEYVAT.revision,
+                "knowledge_endpoint": ETEYVAT.base_url}
+    return plan, metadata, prompt
+
+
+def stage_response(plan: ResponsePlan, metadata: dict[str, Any]) -> None:
+    PENDING_RESPONSES[metadata["correlation_id"]] = (plan, metadata)
+
+
+def approve_response(correlation_id: str) -> tuple[ResponsePlan, dict[str, Any]]:
+    pending = PENDING_RESPONSES.pop(correlation_id, None)
+    if pending is None:
+        raise ValueError("response approval is missing or expired")
+    plan, metadata = pending
+    return replace(plan, requires_operator_approval=False), metadata
+
+
+def private_chat_response(body: dict[str, Any]) -> tuple[ResponsePlan, dict[str, Any]]:
+    message = body.get("message")
+    if not isinstance(message, str) or not message.strip() or len(message) > 4000:
+        raise ValueError("message must be a non-empty string of at most 4000 characters")
+    raw_history = body.get("history", [])
+    if not isinstance(raw_history, list) or len(raw_history) > 20:
+        raise ValueError("history must be a bounded list")
+    history_lines: list[str] = []
+    for item in raw_history:
+        if not isinstance(item, dict) or item.get("role") not in {"user", "assistant"} or not isinstance(item.get("content"), str):
+            raise ValueError("history entries must contain role and content")
+        content = item["content"][:2000].replace("\x00", "")
+        history_lines.append(f"- {item['role']}: {content}")
+    observations = current_observations(OBSERVATIONS)
+    knowledge: list[tuple[str, str, str, str | None]] = []
+    citations: list[dict[str, object]] = []
+    try:
+        knowledge_results = ETEYVAT.search(message, limit=3)
+        if not knowledge_results:
+            subject = message
+            extracted = re.search(r"(?:about|regarding|on|what is|who is)\s+(.+?)[?.!]*$", message, re.IGNORECASE)
+            if extracted:
+                subject = extracted.group(1).strip()
+            knowledge_results = ETEYVAT.find_entity(subject[:200], limit=3)
+        for item in knowledge_results:
+            knowledge.append((item.title, item.content[:1600], item.url, item.revision))
+            citations.append({"evidence_id": item.result_id, "title": item.title, "url": item.url,
+                              "revision": item.revision, "preview": item.preview})
+    except EteyvatError:
+        TELEMETRY.record("knowledge_failure", provider_id=ETEYVAT.source_id, task="private_chat")
+    prompt = PromptAssembler(ME_PROFILE).assemble(PromptContext(
+        recipient=Recipient.MASTER_PRIVATE,
+        user_text="[CHAT HISTORY]\n" + ("\n".join(history_lines) or "- none") + f"\n[CURRENT MESSAGE]\n{message}",
+        memories=MEMORY.retrieve(message, Recipient.MASTER_PRIVATE),
+        observations=observations,
+        knowledge=tuple(knowledge),
+    ))
+    plan = ROUTER.generate(GenerationRequest(
+        task="private_chat", prompt=prompt, recipient=Recipient.MASTER_PRIVATE.value,
+        timeout_seconds=MODEL_CONFIG.timeout_seconds,
+    ))
+    pending_proposals: list[dict[str, Any]] = []
+    for candidate in plan.memory_proposals:
+        proposal = MEMORY.propose(MemoryProposal(
+            content=candidate["content"], provenance=candidate.get("provenance", "siduri_private_chat"),
+            sensitivity=candidate.get("sensitivity", "private"),
+            allowed_audiences=frozenset(candidate.get("allowed_audiences", [Recipient.MASTER_PRIVATE.value])),
+        ))
+        pending_proposals.append(memory_dict(proposal))
+    evidence_ids = tuple(item.evidence_id for item in observations) + tuple(item["evidence_id"] for item in citations)
+    if evidence_ids:
+        plan = replace(plan, evidence_ids=tuple(dict.fromkeys((*plan.evidence_ids, *evidence_ids)))[:32],
+                       confidence=min((plan.confidence, *(item.confidence for item in observations))))
+    metadata = {"channel": "private_chat", "observation_count": len(observations),
+                "evidence_ids": list(evidence_ids), "knowledge_source": ETEYVAT.source_id,
+                "knowledge_revision": ETEYVAT.revision, "citations": citations,
+                "memory_proposals": pending_proposals}
+    return plan, metadata
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "SiduriFoundation/0.1"
 
@@ -176,8 +417,18 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(raw)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
         self.end_headers()
         self.wfile.write(raw)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
@@ -187,6 +438,31 @@ class Handler(BaseHTTPRequestHandler):
         return value
 
     def do_GET(self) -> None:  # noqa: N802
+        parsed_path = urlparse(self.path)
+        if parsed_path.path.startswith("/platforms/oauth/"):
+            parts = parsed_path.path.strip("/").split("/")
+            if len(parts) == 4 and parts[1] == "oauth" and parts[3] == "start":
+                provider_id = parts[2]
+                try:
+                    redirect_uri = parse_qs(parsed_path.query).get("redirect_uri", [os.getenv(f"SIDURI_{provider_id.upper()}_OAUTH_REDIRECT_URI", f"http://127.0.0.1:8765/platforms/oauth/{provider_id}/callback")])[0]
+                    self.send_response(302)
+                    self.send_header("Location", OAUTH_FLOWS.begin(provider_id, redirect_uri))
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                except (KeyError, ValueError) as error:
+                    self._json(400, {"error": str(error)})
+                return
+            if len(parts) == 4 and parts[1] == "oauth" and parts[3] == "callback":
+                provider_id = parts[2]
+                query = parse_qs(parsed_path.query)
+                try:
+                    redirect_uri = query.get("redirect_uri", [os.getenv(f"SIDURI_{provider_id.upper()}_OAUTH_REDIRECT_URI", f"http://127.0.0.1:8765/platforms/oauth/{provider_id}/callback")])[0]
+                    token = OAUTH_FLOWS.complete(provider_id, query.get("code", [""])[0], query.get("state", [""])[0], redirect_uri)
+                    refresh_platform_sender(provider_id, token)
+                    self._json(200, {"authorized": True, "provider": provider_id, "expires_in": token.expires_in})
+                except (KeyError, ValueError) as error:
+                    self._json(400, {"authorized": False, "error": str(error)})
+                return
         if self.path == "/health":
             self._json(200, {"status": "ok"})
         elif self.path == "/ready":
@@ -221,8 +497,16 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path == "/memory/audit":
             self._json(200, {"events": list(MEMORY.audit_events())})
         elif self.path == "/observations":
-            OBSERVATIONS.expire()
-            self._json(200, {"observations": [item.to_dict() for item in OBSERVATIONS.observations]})
+            self._json(200, {"observations": [item.to_dict() for item in current_observations(OBSERVATIONS)]})
+        elif self.path == "/platforms/status":
+            self._json(200, {"platforms": {
+                platform.value: {"configured": platform in PLATFORM_SENDERS, "receive_mode": "adapter_boundary", "send_requires_approval": True}
+                for platform in Platform
+            }})
+        elif self.path == "/platforms/events":
+            self._json(200, {"events": [event.to_dict() for event in PLATFORM_EVENTS.events()]})
+        elif self.path == "/platforms/actions":
+            self._json(200, {"actions": [action.to_dict() for action in PLATFORM_ACTIONS.list()]})
         elif self.path == "/evidence":
             correlation_id = f"corr_{uuid4().hex}"
             try:
@@ -240,6 +524,22 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         try:
+            parsed_path = urlparse(self.path)
+            if parsed_path.path.startswith("/platforms/oauth/"):
+                parts = parsed_path.path.strip("/").split("/")
+                if len(parts) == 4 and parts[1] == "oauth" and parts[3] == "refresh":
+                    provider_id = parts[2]
+                    refreshed = OAUTH_FLOWS.refresh(provider_id)
+                    refresh_platform_sender(provider_id, refreshed)
+                    self._json(200, {"refreshed": True, "provider": provider_id, "expires_in": refreshed.expires_in})
+                    return
+                if len(parts) == 4 and parts[1] == "oauth" and parts[3] == "revoke":
+                    provider_id = parts[2]
+                    OAUTH_FLOWS.revoke(provider_id)
+                    OAUTH_TOKENS.pop(provider_id, None)
+                    PLATFORM_SENDERS.pop(Platform(provider_id), None)
+                    self._json(200, {"revoked": True, "provider": provider_id})
+                    return
             if self.path == "/dev/mock-response":
                 knowledge = ()
                 if os.getenv("SIDURI_ETEYVAT_ENABLED", "true").lower() == "true":
@@ -274,22 +574,71 @@ class Handler(BaseHTTPRequestHandler):
                 if result.observation is None:
                     self._json(409, {"accepted": False, "reason": result.reason})
                     return
-                observation_event = EventEnvelope("ObservationCreated", result.observation.to_dict(), source="observation", privacy_class="private")
+                correlation_id = f"corr_{uuid4().hex}"
+                observation_event = EventEnvelope("ObservationCreated", result.observation.to_dict(), source="observation", privacy_class="private", correlation_id=correlation_id)
                 broadcast({"type": "observation", "event": observation_event.to_dict()})
-                prompt = PromptAssembler(ME_PROFILE).assemble(PromptContext(
-                    recipient=Recipient.MASTER_STREAM,
-                    user_text="fixture observation response request",
-                    memories=MEMORY.retrieve("observation", Recipient.MASTER_STREAM),
-                    observations=(result.observation,),
-                ))
-                plan = ROUTER.generate(GenerationRequest(task="observation_commentary", prompt=prompt, recipient="master_stream"))
-                if result.observation.evidence_id not in plan.evidence_ids:
-                    plan = replace(plan, evidence_ids=tuple(dict.fromkeys((*plan.evidence_ids, result.observation.evidence_id))),
-                                   confidence=min(plan.confidence, result.observation.confidence))
-                response_event = EventEnvelope("ResponsePlanCreated", plan.to_dict())
+                plan, metadata, _prompt = grounded_response(result.observation, correlation_id)
+                stage_response(plan, metadata)
+                response_event = EventEnvelope("ResponsePlanCreated", plan.to_dict(), correlation_id=correlation_id)
+                broadcast({"type": "response_pending", "event": response_event.to_dict(), "metadata": metadata})
+                self._json(202, {"accepted": True, "observation": observation_event.to_dict(), "response": response_event.to_dict(), "metadata": metadata})
+            elif self.path == "/dev/observe-and-respond":
+                result = OBSERVATION_SERVICE.observe_now()
+                if result.observation is None:
+                    self._json(409, {"accepted": False, "reason": result.capture_reason, "duplicate": result.duplicate})
+                    return
+                correlation_id = f"corr_{uuid4().hex}"
+                observation_event = EventEnvelope("ObservationCreated", result.observation.to_dict(), source="observation", privacy_class="private", correlation_id=correlation_id)
+                broadcast({"type": "observation", "event": observation_event.to_dict()})
+                plan, metadata, _prompt = grounded_response(result.observation, correlation_id)
+                stage_response(plan, metadata)
+                response_event = EventEnvelope("ResponsePlanCreated", plan.to_dict(), correlation_id=correlation_id)
+                broadcast({"type": "response_pending", "event": response_event.to_dict(), "metadata": metadata})
+                self._json(202, {"accepted": True, "observation": observation_event.to_dict(), "response": response_event.to_dict(), "metadata": metadata})
+            elif self.path == "/dev/approve-response":
+                correlation_id = str(self._body().get("correlation_id", ""))
+                plan, metadata = approve_response(correlation_id)
+                response_event = EventEnvelope("ResponsePlanCreated", plan.to_dict(), correlation_id=correlation_id)
                 broadcast({"type": "response_plan", "event": response_event.to_dict()})
                 queue_voice(plan)
-                self._json(202, {"accepted": True, "observation": observation_event.to_dict(), "response": response_event.to_dict()})
+                self._json(200, {"approved": True, "response": response_event.to_dict(), "metadata": metadata})
+            elif self.path == "/chat":
+                plan, metadata = private_chat_response(self._body())
+                self._json(200, {"response": plan.to_dict(), "metadata": metadata})
+            elif self.path == "/dev/platform-event":
+                event = platform_event_from_body(self._body())
+                accepted = PLATFORM_EVENTS.ingest(event)
+                self._json(202 if accepted else 200, {"accepted": accepted, "event": event.to_dict()})
+            elif self.path == "/platforms/actions":
+                body = self._body()
+                action = OutboundAction(
+                    platform=Platform(str(body["platform"])), action_type=str(body.get("action_type", "chat_message")),
+                    target_id=str(body["target_id"]), text=str(body["text"]),
+                    evidence_ids=tuple(str(item) for item in body.get("evidence_ids", [])),
+                )
+                self._json(202, {"action": PLATFORM_ACTIONS.propose(action).to_dict()})
+            elif self.path == "/platforms/actions/suggest":
+                body = self._body()
+                plan, action = platform_reply_suggestion(str(body["event_id"]), str(body.get("language", "en")))
+                self._json(202, {"suggested": True, "response": plan.to_dict(), "action": action.to_dict()})
+            elif self.path == "/platforms/actions/approve":
+                body = self._body()
+                action = PLATFORM_ACTIONS.approve(str(body["action_id"]), str(body["text"]) if "text" in body else None)
+                self._json(200, {"action": action.to_dict()})
+            elif self.path == "/platforms/actions/reject":
+                action = PLATFORM_ACTIONS.reject(str(self._body()["action_id"]))
+                self._json(200, {"action": action.to_dict()})
+            elif self.path == "/platforms/actions/send":
+                action_id = str(self._body()["action_id"])
+                action = PLATFORM_ACTIONS.get(action_id)
+                if action is None:
+                    raise KeyError(action_id)
+                sender = PLATFORM_SENDERS.get(action.platform)
+                if sender is None:
+                    self._json(503, {"sent": False, "error": "platform_sender_not_configured"})
+                    return
+                sent, receipt = PLATFORM_ACTIONS.send(action_id, sender)
+                self._json(200, {"sent": True, "receipt": receipt, "action": sent.to_dict()})
             elif self.path == "/memory":
                 body = self._body()
                 item = MEMORY.create(MemoryItem(content=str(body["content"]), provenance=str(body["provenance"]), sensitivity=str(body.get("sensitivity", "private")), allowed_audiences=frozenset(body.get("allowed_audiences", []))))
@@ -303,6 +652,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(200, {"item": memory_dict(proposal)})
             elif self.path == "/memory/proposals/reject":
                 proposal = MEMORY.reject(str(self._body()["proposal_id"]))
+                self._json(200, {"proposal": memory_dict(proposal)})
+            elif self.path == "/memory/proposals/update":
+                body = self._body()
+                audiences = body.get("allowed_audiences")
+                proposal = MEMORY.update_proposal(
+                    str(body["proposal_id"]), content=str(body["content"]),
+                    sensitivity=str(body["sensitivity"]) if "sensitivity" in body else None,
+                    allowed_audiences=frozenset(audiences) if isinstance(audiences, list) else None,
+                )
                 self._json(200, {"proposal": memory_dict(proposal)})
             else:
                 self._json(404, {"error": "not_found"})
@@ -354,11 +712,13 @@ def main() -> None:
     port = int(os.getenv("SIDURI_PORT", "8765"))
     server = ThreadingHTTPServer((host, port), Handler)
     LOG.info("Siduri orchestrator listening on http://%s:%d", host, port)
+    start_platform_workers()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         LOG.info("shutting down")
     finally:
+        stop_platform_workers()
         server.server_close()
 
 

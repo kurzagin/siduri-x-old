@@ -35,4 +35,6 @@ The code now contains a transport-neutral capture boundary in `packages/obs/capt
 
 The concrete OBS WebSocket v5 transport is implemented in `packages/obs/capture.py`. On 2026-07-30 it authenticated against the local OBS server, connected to source `genshin`, reported `streaming=false` and `recording=false`, and returned one still screenshot (231,934 bytes). The screenshot was not persisted or logged. Do not send the password in chat; it remains in the local ignored environment.
 
+On 2026-07-30 the running orchestrator reported `configured=true`, `connected=true`, `capture_enabled=true`, and source `genshin`; a live `POST /dev/observe-now` capture completed and subsequent duplicate suppression returned `near_duplicate_frame`. VOICEVOX was not reachable at `127.0.0.1:50021` during the same check, so audio remains subtitle-fallback until the local engine is started.
+
 Pixel redaction rectangles can be configured locally with `SIDURI_OBS_REDACTION_RECTS=x,y,width,height;...`. They are applied in memory to supported PNG screenshots before the observation provider receives the frame.

@@ -19,6 +19,7 @@ class EntityRecord:
     aliases: tuple[str, ...] = ()
     source_url: str | None = None
     revision: str | None = None
+    preview: bool = False
 
 
 @dataclass(frozen=True)
@@ -56,5 +57,5 @@ class EteyvatEntityResolver:
         if not callable(finder):
             raise TypeError("knowledge source does not support entity lookup")
         results = finder(label, limit=max(1, min(5, limit)))
-        records = tuple(EntityRecord(item.result_id, item.title, (label,), item.url, item.revision) for item in results)
+        records = tuple(EntityRecord(item.result_id, item.title, (label,), item.url, item.revision, bool(getattr(item, "preview", False))) for item in results)
         return EntityMatch(label, records, confidence, len(records) != 1 or confidence < 0.7)
