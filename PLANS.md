@@ -73,6 +73,7 @@ Phase 7 live-service verification is on hold because the current machine does no
 - [x] Migrate the operator console route to `/operator`.
 - [x] Migrate the OBS overlay route to `/overlay`.
 - [x] Remove the legacy static HTML/JavaScript entrypoints after route parity review.
+- [x] Redesign the operator console as a dashboard with status cards, tables, approval queues, and expandable technical details.
 - [ ] Extract shared typed API/WebSocket client utilities and shared UI components.
 
 ## Phase 7: YouTube and Twitch platform boundary
