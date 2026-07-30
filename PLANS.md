@@ -64,6 +64,17 @@ The remaining operator step is to add the overlay browser source to the desired 
 
 The current continuation is [`docs/CODEX_PROMPT_07_HANDOFF.md`](docs/CODEX_PROMPT_07_HANDOFF.md): authorize test platforms, start VOICEVOX, and complete operator-owned OBS/live-service verification.
 
+## Current frontend migration
+
+Phase 7 live-service verification is on hold because the current machine does not provide the game, OBS, VOICEVOX, or live platform environment. Frontend work continues locally in the Next.js app under `apps/web`:
+
+- [x] Add Next.js 16 App Router shell and shared metadata/build configuration.
+- [x] Migrate the private chat route to `/chat`.
+- [x] Migrate the operator console route to `/operator`.
+- [x] Migrate the OBS overlay route to `/overlay`.
+- [x] Remove the legacy static HTML/JavaScript entrypoints after route parity review.
+- [ ] Extract shared typed API/WebSocket client utilities and shared UI components.
+
 ## Phase 7: YouTube and Twitch platform boundary
 
 - [x] Add versioned normalized platform event and outbound action contracts.

@@ -2,10 +2,21 @@
   "name": "siduri",
   "private": true,
   "scripts": {
-    "typecheck": "tsc --noEmit",
-    "build": "tsc"
+    "dev": "next dev apps/web",
+    "web:build": "next build apps/web",
+    "web:start": "next start apps/web",
+    "typecheck": "tsc -p apps/web --noEmit",
+    "build": "npm run web:build"
+  },
+  "dependencies": {
+    "next": "16.2.12",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
     "typescript": "5.9.2"
   }
 }

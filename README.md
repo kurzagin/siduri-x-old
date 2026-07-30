@@ -10,19 +10,13 @@ In one terminal:
 python -m apps.orchestrator.src.siduri_orchestrator.server
 ```
 
-Then open these files in a browser:
-
-- `apps/overlay/index.html` — public transparent-style Venus overlay.
-- `apps/operator_console/index.html` — local operator shell.
-- `apps/chat/index.html` — private local chat client for talking with Siduri.
-
-To serve the HTML clients with working CSS and navigation, start a second local server from the repository root:
+Then start the Next.js web client in a second terminal:
 
 ```bash
-python -m http.server 4173 --directory apps
+npm run dev
 ```
 
-Then use `http://127.0.0.1:4173/chat/` or `http://127.0.0.1:4173/operator_console/`. Do not serve from `apps/chat` alone, because that makes the shared navigation links resolve incorrectly.
+Open `http://127.0.0.1:3000/chat`, `http://127.0.0.1:3000/operator`, or `http://127.0.0.1:3000/overlay`. The Next.js app in `apps/web` is the canonical frontend.
 
 The operator console can trigger `POST /dev/mock-response`. The overlay reconnects to `ws://127.0.0.1:8765/ws`, displays the Japanese speech line plus English and Indonesian subtitles, and reacts to real VOICEVOX speech/amplitude events.
 
