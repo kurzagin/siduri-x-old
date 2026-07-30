@@ -20,6 +20,8 @@ Open `http://127.0.0.1:3000/chat`, `http://127.0.0.1:3000/operator`, or `http://
 
 The operator console can trigger `POST /dev/mock-response`. The overlay reconnects to `ws://127.0.0.1:8765/ws`, displays the Japanese speech line plus English and Indonesian subtitles, and reacts to real VOICEVOX speech/amplitude events.
 
+The `/operator` route is a local operations dashboard. Its Overview shows orchestrator, voice, OBS, and platform status; Memory, Evidence, and Platforms use structured review tables; Settings contains the local `Me` profile editor. Raw payloads are available only under expandable technical details. Approval-gated controls remain explicit for grounded responses, memory candidates, and outbound platform actions.
+
 The operator console also exposes the Phase 2 local `Me` editor and a review queue for Siduri's isolated memory candidates. The orchestrator provides `GET/PUT /me`, `GET/POST /memory`, `GET/POST /memory/proposals`, plus proposal update/approve/reject endpoints. Candidates remain outside canonical memory until operator approval. Local profile edits persist under ignored `data/me.json`; memory records persist under ignored `data/memory.sqlite3`. PostgreSQL deployment uses `migrations/002_memory.sql` and the optional `siduri[postgres]` adapter.
 
 The operator console also exposes fixture-first evidence inspection. `POST /dev/mock-observation` creates a synthetic, expiring observation; `GET /observations` lists retained observations and `GET /evidence` retrieves bounded E-Teyvat citation metadata. These fixtures are not live Genshin evidence and are intended to be replaced with configured screenshots later.
