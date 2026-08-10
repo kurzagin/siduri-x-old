@@ -1,16 +1,36 @@
 # Siduri
 
-Siduri is Kur Zagin’s local-first Records Keeper and stream companion. This repository contains the Phase 0 and minimum Phase 1 foundation described in [`docs/CODEX_PROMPT_01_SIDURI_FOUNDATION.md`](docs/CODEX_PROMPT_01_SIDURI_FOUNDATION.md).
+Siduri is Kur Zagin’s Records Keeper and stream companion. Supabase Postgres is
+the authoritative persistent memory backend; identity, relationship, and
+behavior changes remain approval-gated.
+
+The implemented conversational memory and learned-behavior flow is documented
+in [`docs/memory/IMPLEMENTED_MEMORY_AND_BEHAVIOR.md`](docs/memory/IMPLEMENTED_MEMORY_AND_BEHAVIOR.md).
+Supabase provisioning and one-time import are documented in
+[`docs/memory/SUPABASE_SETUP.md`](docs/memory/SUPABASE_SETUP.md).
+Connection pooling, timeout guarantees, and chat-failure troubleshooting are
+documented in
+[`docs/memory/SUPABASE_RUNTIME_RELIABILITY.md`](docs/memory/SUPABASE_RUNTIME_RELIABILITY.md).
 
 ## Run the vertical slice
 
-In one terminal:
+Start the supervised local stack:
+
+```bash
+./start.sh
+```
+
+The script waits for both services to become healthy before reporting that
+Siduri is ready. If either service exits, it stops the other one as well instead
+of leaving a frontend that can only return 502 responses.
+
+To run the services separately, use two terminals. In the first:
 
 ```bash
 python -m apps.orchestrator.src.siduri_orchestrator.server
 ```
 
-Then start the Next.js web client in a second terminal:
+Then start the Next.js web client in the second:
 
 ```bash
 npm run dev
@@ -22,7 +42,23 @@ The operator console can trigger `POST /dev/mock-response`. The overlay reconnec
 
 The `/operator` route is a local operations dashboard. Its Overview shows orchestrator, voice, OBS, and platform status; Memory, Evidence, and Platforms use structured review tables; Settings contains the local `Me` profile editor. Raw payloads are available only under expandable technical details. Approval-gated controls remain explicit for grounded responses, memory candidates, and outbound platform actions.
 
-The operator console also exposes the Phase 2 local `Me` editor and a review queue for Siduri's isolated memory candidates. The orchestrator provides `GET/PUT /me`, `GET/POST /memory`, `GET/POST /memory/proposals`, plus proposal update/approve/reject endpoints. Candidates remain outside canonical memory until operator approval. Local profile edits persist under ignored `data/me.json`; memory records persist under ignored `data/memory.sqlite3`. PostgreSQL deployment uses `migrations/002_memory.sql` and the optional `siduri[postgres]` adapter.
+The operator console exposes separate review and inspection surfaces for pending
+memory candidates, versioned claims, behavioral directives, and legacy memory
+projections. Static `Me` profile authoring is deprecated in favor of private
+conversational teaching. Candidates remain outside canonical memory and Active
+Self until explicit approval. Memory records persist in single-user Supabase
+Postgres tables defined by `migrations/002_memory.sql`. The orchestrator does
+not dual-write or fall back to SQLite persistence. The former
+`data/memory.sqlite3` file is only an optional one-time migration source.
+
+Before starting Siduri, apply `migrations/002_memory.sql` to a Supabase project
+and configure its pooled database URL as described in `.env.example`.
+Install Python dependencies with:
+
+```bash
+python -m venv .venv
+.venv/bin/pip install -e '.[platforms]'
+```
 
 The operator console also exposes fixture-first evidence inspection. `POST /dev/mock-observation` creates a synthetic, expiring observation; `GET /observations` lists retained observations and `GET /evidence` retrieves bounded E-Teyvat citation metadata. These fixtures are not live Genshin evidence and are intended to be replaced with configured screenshots later.
 

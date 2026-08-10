@@ -63,7 +63,7 @@ class MeProfile:
         allowed = set(self.privacy.get("fields_allowed_on_stream", []))
         identity = {key: value for key, value in self.identity.items() if key in allowed}
         projects = {key: value for key, value in self.projects.items() if key in allowed}
-        return {"identity": identity, "projects": projects}
+        return {"identity": identity, "projects": projects, "relationship_with_siduri": self.relationship_with_siduri, "communication": self.communication, "habits": self.habits, "interests": self.interests}
 
 
 @dataclass(frozen=True)

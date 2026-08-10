@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { WS_URL } from "../../lib/api";
 
 type ResponseEvent = { type: "response_plan"; event: { payload: { spoken_ja: string; subtitle_en: string; subtitle_id: string; emotion: string } } };
 type SpeechEvent = { type: "speech_event"; event: { event_type: string; payload: { amplitude?: number } } };
@@ -15,7 +16,7 @@ export default function OverlayClient() {
     let retry: number | undefined;
     let socket: WebSocket;
     const connect = () => {
-      socket = new WebSocket("ws://127.0.0.1:8765/ws");
+      socket = new WebSocket(WS_URL);
       socket.onopen = () => setStatus("online · idle");
       socket.onclose = () => { setStatus("reconnecting"); retry = window.setTimeout(connect, 1500); };
       socket.onerror = () => socket.close();

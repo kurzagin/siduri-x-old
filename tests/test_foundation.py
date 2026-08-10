@@ -53,23 +53,48 @@ class FoundationTests(unittest.TestCase):
             thread.start()
             try:
                 connection = HTTPConnection("127.0.0.1", http_server.server_port)
-                connection.request("GET", "/health")
+                connection.request("GET", "/health", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 200)
                 self.assertEqual(json.loads(response.read())["status"], "ok")
-                connection.request("POST", "/dev/mock-response")
+                connection.request("POST", "/dev/mock-response", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 202)
-                connection.request("POST", "/dev/mock-observe-response")
+                connection.request("POST", "/dev/mock-observe-response", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 202)
                 pending = json.loads(response.read())
                 self.assertTrue(pending["response"]["payload"]["evidence_ids"])
                 self.assertTrue(pending["response"]["payload"]["requires_operator_approval"])
-                connection.request("POST", "/dev/approve-response", body=json.dumps({"correlation_id": pending["metadata"]["correlation_id"]}), headers={"Content-Type": "application/json"})
+                connection.request("POST", "/dev/approve-response", body=json.dumps({"correlation_id": pending["metadata"]["correlation_id"]}), headers={"Content-Type": "application/json", "Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 200)
                 self.assertFalse(json.loads(response.read())["response"]["payload"]["requires_operator_approval"])
+            finally:
+                http_server.shutdown()
+                http_server.server_close()
+
+    def test_unexpected_post_failure_returns_json_instead_of_dropping_socket(self) -> None:
+        with patch(
+            "apps.orchestrator.src.siduri_orchestrator.server.private_chat_response",
+            side_effect=RuntimeError("database transport failed"),
+        ):
+            http_server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                connection = HTTPConnection("127.0.0.1", http_server.server_port, timeout=2)
+                connection.request(
+                    "POST",
+                    "/chat",
+                    body=json.dumps({"message": "hello", "history": []}),
+                    headers={"Content-Type": "application/json", "Origin": "http://localhost:3000"},
+                )
+                response = connection.getresponse()
+                payload = json.loads(response.read())
+                self.assertEqual(response.status, 500)
+                self.assertEqual(payload["error"], "Siduri could not complete this request.")
+                self.assertEqual(payload["detail"], "RuntimeError")
             finally:
                 http_server.shutdown()
                 http_server.server_close()
@@ -81,7 +106,7 @@ class FoundationTests(unittest.TestCase):
             thread.start()
             try:
                 connection = HTTPConnection("127.0.0.1", http_server.server_port)
-                headers = {"Content-Type": "application/json"}
+                headers = {"Content-Type": "application/json", "Origin": "http://localhost:3000"}
                 connection.request("POST", "/memory/proposals", body=json.dumps({
                     "content": "Kur prefers concise corrections.",
                     "provenance": "endpoint test",
@@ -101,7 +126,7 @@ class FoundationTests(unittest.TestCase):
                 self.assertEqual(response.status, 200)
                 self.assertEqual(json.loads(response.read())["proposal"]["status"], "pending")
 
-                connection.request("GET", "/memory/proposals")
+                connection.request("GET", "/memory/proposals", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 listed = json.loads(response.read())["proposals"]
                 self.assertEqual(listed[0]["content"], "Kur prefers concise, evidence-based corrections.")
@@ -112,7 +137,7 @@ class FoundationTests(unittest.TestCase):
                 approved = json.loads(response.read())["item"]
                 self.assertEqual(approved["content"], "Kur prefers concise, evidence-based corrections.")
 
-                connection.request("GET", "/memory")
+                connection.request("GET", "/memory", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(len(json.loads(response.read())["items"]), 1)
 
@@ -130,14 +155,14 @@ class FoundationTests(unittest.TestCase):
             thread.start()
             try:
                 connection = HTTPConnection("127.0.0.1", http_server.server_port)
-                headers = {"Content-Type": "application/json"}
+                headers = {"Content-Type": "application/json", "Origin": "http://localhost:3000"}
                 connection.request("POST", "/dev/platform-event", body=json.dumps({
                     "platform": "twitch", "source_message_id": "chat-1", "channel_id": "channel-1",
                     "author_id": "viewer-1", "author_display_name": "Viewer", "text": "hello",
                 }), headers=headers)
                 response = connection.getresponse()
                 self.assertEqual(response.status, 202)
-                connection.request("GET", "/platforms/events")
+                connection.request("GET", "/platforms/events", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 event = json.loads(response.read())["events"][0]
                 self.assertEqual(event["privacy_class"], "untrusted_public")
@@ -199,13 +224,13 @@ class FoundationTests(unittest.TestCase):
                 connection = HTTPConnection("127.0.0.1", http_server.server_port)
                 redirect_uri = "http://127.0.0.1:8765/callback"
                 encoded = "http%3A%2F%2F127.0.0.1%3A8765%2Fcallback"
-                connection.request("GET", f"/platforms/oauth/youtube/start?redirect_uri={encoded}")
+                connection.request("GET", f"/platforms/oauth/youtube/start?redirect_uri={encoded}", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 302)
                 location = response.getheader("Location") or ""
                 from urllib.parse import parse_qs, urlparse
                 state = parse_qs(urlparse(location).query)["state"][0]
-                connection.request("GET", f"/platforms/oauth/youtube/callback?code=code&state={state}&redirect_uri={encoded}")
+                connection.request("GET", f"/platforms/oauth/youtube/callback?code=code&state={state}&redirect_uri={encoded}", headers={"Origin": "http://localhost:3000"})
                 response = connection.getresponse()
                 self.assertEqual(response.status, 200)
                 body = json.loads(response.read())

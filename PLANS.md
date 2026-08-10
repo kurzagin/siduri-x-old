@@ -19,7 +19,52 @@
 - [x] Local operator editor and API endpoints for `Me`.
 - [x] Personality/privacy evaluation tests.
 
-Phase 2 uses durable local SQLite memory and persisted local `Me` data, with PostgreSQL schema/adapter preparation. Provider-independent model routing is present, and live GLM-5.2 use is now verified through the orchestrator.
+Phase 2 now uses single-user Supabase Postgres as the authoritative persistent
+memory backend. RLS blocks direct Supabase client access; the local orchestrator
+is the only memory client. Unit tests retain a nonpersistent implementation;
+SQLite is not a runtime persistence fallback.
+
+- [x] Make Supabase access thread-safe with bounded connection pooling.
+- [x] Disable prepared statements that are incompatible with the Supabase
+  transaction pooler.
+- [x] Apply transaction-local statement, lock, and idle-transaction limits.
+- [x] Return sanitized JSON for unexpected POST failures instead of dropping
+  the frontend proxy socket.
+
+### Next memory direction: Teach Siduri
+
+The next personalisation slice is specified in [`docs/memory/TEACH_SIDURI.md`](docs/memory/TEACH_SIDURI.md). Real Me data remains out of scope until the versioned claim lifecycle, conversational confirmation, evidence-linked retrieval, privacy gates, and fictional evaluation fixtures are implemented.
+
+- [ ] Keep real `Me` data absent during memory redesign.
+- [x] Define versioned source-event and claim contracts.
+- [x] Add temporal, provenance-preserving claim storage.
+- [x] Add private conversational Teach mode with inline confirmation.
+- [ ] Replace keyword-only retrieval with hybrid, temporal, evidence-linked retrieval. Exact structured retrieval, weighted lexical fallback, and optional FTS5 are implemented; semantic retrieval remains optional pending evaluation.
+- [ ] Add correction, forget, export, and explain-memory flows for versioned claims. Legacy memory operations do not satisfy this gate.
+- [ ] Complete local API authentication before onboarding. Strict origin checks exist, but origin checks are not authentication.
+- [ ] Complete extraction, updates, contradictions, abstention, and memory-poisoning evaluation with fictional data. The current suite covers the foundation but not the full matrix.
+
+### Current week: learned behavior and personal/game knowledge
+
+- [x] Separate knowledge domain from runtime effect classification.
+- [x] Send confirmed Active Self through the provider system role on private,
+  stream, observation, and platform response paths.
+- [x] Convert approved teaching candidates into provenance-linked versioned
+  claims while retaining legacy text memory as a compatibility projection.
+- [x] Add deterministic pending extraction for identity, creator relationship,
+  scoped preferred address, and Genshin account basics.
+- [x] Add deterministic subject/predicate query and recipient-aware game-account
+  retrieval.
+- [x] Show structured claims and behavioral directives separately in the operator
+  console.
+- [x] Add Postgres generated full-text retrieval with deterministic structured
+  and lexical fallback.
+- [x] Add guided private-chat onboarding templates for behavior, relationship,
+  and game-profile teaching.
+- [ ] Add optional embeddings only after lexical evaluation demonstrates misses.
+- [x] Run an operator-approved live GLM conversation with isolated fictional
+  data that teaches, confirms, and demonstrates behavior across a fresh
+  unrelated conversation. Real private onboarding remains user-controlled.
 
 ## First model integration
 
@@ -74,7 +119,7 @@ Phase 7 live-service verification is on hold because the current machine does no
 - [x] Migrate the OBS overlay route to `/overlay`.
 - [x] Remove the legacy static HTML/JavaScript entrypoints after route parity review.
 - [x] Redesign the operator console as a dashboard with status cards, tables, approval queues, and expandable technical details.
-- [ ] Extract shared typed API/WebSocket client utilities and shared UI components.
+- [x] Extract shared typed API/WebSocket client utilities and shared UI components.
 
 ## Phase 7: YouTube and Twitch platform boundary
 

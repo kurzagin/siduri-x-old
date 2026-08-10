@@ -13,10 +13,10 @@ class ChatCorsTests(unittest.TestCase):
         thread.start()
         try:
             connection = HTTPConnection("127.0.0.1", server.server_port)
-            connection.request("OPTIONS", "/chat", headers={"Origin": "null", "Access-Control-Request-Method": "POST"})
+            connection.request("OPTIONS", "/chat", headers={"Origin": "http://localhost:3000", "Access-Control-Request-Method": "POST"})
             response = connection.getresponse()
             self.assertEqual(response.status, 204)
-            self.assertEqual(response.getheader("Access-Control-Allow-Origin"), "*")
+            self.assertEqual(response.getheader("Access-Control-Allow-Origin"), "http://localhost:3000")
             self.assertIn("POST", response.getheader("Access-Control-Allow-Methods", ""))
         finally:
             server.shutdown()

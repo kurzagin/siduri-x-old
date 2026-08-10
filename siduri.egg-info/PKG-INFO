@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: siduri
+Version: 0.1.0
+Summary: AI VTuber and stream companion with Supabase-backed memory
+Requires-Python: >=3.12
+Requires-Dist: psycopg[binary,pool]<4,>=3.2
+Provides-Extra: platforms
+Requires-Dist: cryptography<47,>=42; extra == "platforms"
+Requires-Dist: websocket-client<2,>=1.8; extra == "platforms"

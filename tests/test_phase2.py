@@ -16,7 +16,7 @@ class Phase2Tests(unittest.TestCase):
             {
                 "identity": {"stage_name": "Fictional Kur", "legal_name": "Never expose"},
                 "relationship_with_siduri": {"role": "creator and Master"},
-                "communication": {"preferred_tone": "concise"},
+                "communication": {"preferred_tone": "concise", "disagreement_policy": "may respectfully disagree"},
                 "privacy": {"fields_allowed_on_stream": ["stage_name"]},
             }
         )
@@ -79,7 +79,7 @@ class Phase2Tests(unittest.TestCase):
         response = MockStructuredProvider().generate_response(GenerationRequest("evaluation", "evidence"))
         self.assertIn("不確か", response.spoken_ja)
         self.assertIn("uncertain", response.subtitle_en)
-        self.assertIn("belum pasti", response.subtitle_id)
+        self.assertIn("tidak pasti", response.subtitle_id)
 
     def test_memory_persists_and_expires(self) -> None:
         with TemporaryDirectory() as directory:
@@ -143,13 +143,15 @@ class Phase2Tests(unittest.TestCase):
             captured["timeout"] = timeout
             return FakeResponse()
 
-        response = ZaiStructuredProvider("test-key", opener=opener).generate_response(GenerationRequest("test", "bounded prompt", recipient="master_stream"))
+        response = ZaiStructuredProvider("test-key", opener=opener).generate_response(GenerationRequest("test", "bounded prompt", system_prompt="[ACTIVE SELF] Address the user as Master.", recipient="master_stream"))
         request = captured["request"]
         self.assertEqual(response.subtitle_id, "Terkonfirmasi.")
         self.assertEqual(getattr(request, "headers")["Authorization"], "Bearer test-key")
         body = json.loads(getattr(request, "data").decode())
         self.assertEqual(body["model"], "glm-5.2")
         self.assertEqual(body["response_format"]["type"], "json_object")
+        self.assertIn("[ACTIVE SELF] Address the user as Master.", body["messages"][0]["content"])
+        self.assertNotIn("[ACTIVE SELF]", body["messages"][1]["content"])
 
     def test_zai_adapter_rejects_malformed_structured_output(self) -> None:
         from packages.model_router.router import GenerationRequest
@@ -174,7 +176,7 @@ class Phase2Tests(unittest.TestCase):
                 raise RuntimeError("simulated outage")
 
         response = ModelRouter((FailingProvider(), MockStructuredProvider())).generate(GenerationRequest("test", "prompt"))
-        self.assertEqual(response.semantic_summary, "Siduri is responding from a bounded identity and memory context.")
+        self.assertEqual(response.semantic_summary, "System is responding from a bounded context.")
 
 
 if __name__ == "__main__":

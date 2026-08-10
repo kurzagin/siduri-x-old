@@ -1,0 +1,5 @@
+psycopg[binary,pool]<4,>=3.2
+
+[platforms]
+cryptography<47,>=42
+websocket-client<2,>=1.8

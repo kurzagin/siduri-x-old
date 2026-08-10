@@ -1,13 +1,20 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "siduri"
 version = "0.1.0"
-description = "Local-first AI VTuber and stream companion foundation"
+description = "AI VTuber and stream companion with Supabase-backed memory"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["psycopg[binary,pool]>=3.2,<4"]
 
 [project.optional-dependencies]
-postgres = ["psycopg[binary]>=3.2,<4"]
 platforms = ["cryptography>=42,<47", "websocket-client>=1.8,<2"]
+
+[tool.setuptools.packages.find]
+include = ["apps*", "packages*"]
+exclude = ["tests*", "data*", "assets*", "config*", "migrations*", "node_modules*"]
 
 [tool.pyright]
 include = ["apps", "packages", "tests"]

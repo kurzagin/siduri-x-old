@@ -1,5 +1,9 @@
 # ADR 003: PostgreSQL portability
 
+## Status
+
+Superseded by ADR 009
+
 ## Context
 
 Local tests must run without a database daemon, while deployment may require PostgreSQL.

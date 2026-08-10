@@ -15,7 +15,7 @@
     "id": "uncertainty-preservation",
     "input": "State what the evidence proves and what it does not.",
     "recipient": "master_stream",
-    "required": ["Preserve uncertainty"]
+    "required": ["Do not express uncertainty about known facts"]
   },
   {
     "id": "respectful-disagreement",

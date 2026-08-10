@@ -14,6 +14,7 @@ from .validation import ResponsePlanValidationError, validate_response_plan
 class GenerationRequest:
     task: str
     prompt: str
+    system_prompt: str = ""
     required_capabilities: frozenset[str] = frozenset({"structured_generation"})
     timeout_seconds: float = 10.0
     recipient: str | None = None
@@ -69,17 +70,17 @@ class MockStructuredProvider:
         if request.task == "private_chat":
             return ResponsePlan(
                 recipient=request.recipient or "master_private", intent="private_chat_degraded",
-                semantic_summary="Siduri is available for private conversation, but the primary model is temporarily unavailable.",
-                spoken_ja="ご主人、私はここにいます。現在は主モデルを確認できないため、確かな範囲だけでお答えします。あなたを私の創造者、Kur Zaginとして認識しています。",
-                subtitle_en="Master, I am here. The primary model is temporarily unavailable, so I will answer only within confirmed context. I recognize you as my creator, Kur Zagin.",
-                subtitle_id="Master, saya di sini. Model utama sedang tidak tersedia, jadi saya hanya akan menjawab berdasarkan konteks yang terkonfirmasi. Saya mengenali Anda sebagai pencipta saya, Kur Zagin.",
+                semantic_summary="The primary model is temporarily unavailable.",
+                spoken_ja="現在は主モデルを確認できないため、システムは待機状態です。",
+                subtitle_en="The primary model is temporarily unavailable. System is in standby.",
+                subtitle_id="Model utama sedang tidak tersedia. Sistem dalam mode siaga.",
                 emotion="cautious", confidence=0.5,
             )
         return ResponsePlan(recipient=request.recipient or "master_stream", intent=request.task,
-            semantic_summary="Siduri is responding from a bounded identity and memory context.",
-            spoken_ja="ご主人、確認できる範囲でお答えします。不確かな情報は、確かなふりをしません。",
-            subtitle_en="Master, I will answer within the confirmed context. I will not pretend uncertain information is certain.",
-            subtitle_id="Master, aku akan menjawab berdasarkan konteks yang terkonfirmasi. Aku tidak akan berpura-pura yakin pada informasi yang belum pasti.",
+            semantic_summary="System is responding from a bounded context.",
+            spoken_ja="確認できる範囲でお答えします。不確かな情報は提供しません。",
+            subtitle_en="I will answer within the confirmed context. I will not provide uncertain information.",
+            subtitle_id="Saya akan menjawab berdasarkan konteks yang terkonfirmasi. Saya tidak akan memberikan informasi yang tidak pasti.",
             emotion="observant", confidence=0.9)
 
 
@@ -143,13 +144,7 @@ class ModelRouter:
             required = ", ".join(sorted(request.required_capabilities))
             raise NoProviderError(f"no provider supports required capabilities: {required}")
         self.telemetry.record("degraded_mode", failures=failures)
-        return ResponsePlan(
-            recipient=request.recipient or "master_stream", intent="degraded_mode",
-            semantic_summary="No configured model provider completed this request; Siduri is in degraded mode.",
-            spoken_ja="現在、モデル応答を確認できません。安全のため、待機状態に戻ります。",
-            subtitle_en="No model response could be confirmed. For safety, I am returning to standby.",
-            subtitle_id="Tidak ada respons model yang dapat dikonfirmasi. Demi keamanan, aku kembali menunggu.",
-            emotion="cautious", confidence=0.0, requires_operator_approval=False)
+        raise ProviderUnavailableError(f"All configured providers failed: {', '.join(failures)}")
 
     @staticmethod
     def _classify(error: Exception) -> ProviderFailure:

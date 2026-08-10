@@ -4,7 +4,7 @@ import unittest
 
 from apps.orchestrator.src.siduri_orchestrator.contracts import ResponsePlan
 from packages.config.providers import ProviderConfig
-from packages.model_router.router import GenerationRequest, ModelRouter, RateLimitProviderFailure
+from packages.model_router.router import GenerationRequest, ModelRouter, RateLimitProviderFailure, ProviderUnavailableError
 from packages.model_router.telemetry import TelemetryRecorder
 
 
@@ -43,9 +43,8 @@ class Prompt03Tests(unittest.TestCase):
             def generate_response(self, _request: GenerationRequest) -> ResponsePlan:
                 return ResponsePlan("viewer_direct", "test", "bad", "危険", "Unsafe", "Tidak aman")
 
-        result = ModelRouter((Misaddressed(),), failure_threshold=1).generate(GenerationRequest("test", "data", recipient="master_stream"))
-        self.assertEqual(result.intent, "degraded_mode")
-        self.assertNotEqual(result.recipient, "viewer_direct")
+        with self.assertRaises(ProviderUnavailableError):
+            ModelRouter((Misaddressed(),), failure_threshold=1).generate(GenerationRequest("test", "data", recipient="master_stream"))
 
 
 if __name__ == "__main__":
