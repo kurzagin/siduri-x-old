@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "siduri"
 version = "0.1.0"
 description = "AI VTuber and stream companion with Supabase-backed memory"
+license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = ["psycopg[binary,pool]>=3.2,<4"]
 

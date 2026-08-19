@@ -1,6 +1,7 @@
 {
   "name": "siduri",
   "private": true,
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev apps/web",
     "web:build": "next build apps/web",

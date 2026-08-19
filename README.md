@@ -112,3 +112,10 @@ The script is manual and local-only. It installs packages, initializes PostgreSQ
 ## Boundaries
 
 The domain depends on capabilities, not provider company names. The current server has an in-process event bus, mock model provider, fake knowledge source, in-memory repository, and explicit stubs for vision, TTS, OBS, platforms, and storage. See [`docs/architecture/ARCHITECTURE.md`](docs/architecture/ARCHITECTURE.md) and [`docs/adr/`](docs/adr/).
+
+## License
+
+Copyright (c) 2026 Kur Zagin. All rights reserved.
+
+This project is released under a restricted proprietary license. See [`LICENSE`](LICENSE) for terms.
+
